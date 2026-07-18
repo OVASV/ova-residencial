@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+backend/public/
+frontend/dist/
+
+# Secretos y entorno (NUNCA subir)
+.env
+*.env
+!.env.example
+backend/.env
+frontend/.env
+
+# Archivos subidos por usuarios (comprobantes, logos)
+uploads/
+backend/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma (motores generados)
+backend/prisma/generated/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/

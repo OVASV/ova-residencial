@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 13px;
+}
+
+body {
+  margin: 0;
+  background: #f4f5f7;
+  color: #1a2233;
+}
+
+@media print {
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
+  .no-print { display: none !important; }
+  @page { margin: 12mm; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slide-in-right 0.25s ease-out;
+}

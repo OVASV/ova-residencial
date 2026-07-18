@@ -1,0 +1,580 @@
+generator client {
+  provider      = "prisma-client-js"
+  // "native" para desarrollo local (Windows); el target Debian es el motor que
+  // necesita Azure App Service (Linux). Genera ambos para que funcione en los dos.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model complejos {
+  id                  String                @id(map: "PK_complejos") @default(dbgenerated("newid()"), map: "DF_complejos_id") @db.UniqueIdentifier
+  nombre              String                @db.NVarChar(100)
+  direccion           String?               @db.NVarChar(Max)
+  ciudad              String?               @db.NVarChar(80)
+  id_pais             Int?                  @db.SmallInt
+  activo              Boolean               @default(true, map: "DF_complejos_activo")
+  created_at          DateTime              @default(dbgenerated("sysdatetimeoffset()"), map: "DF_complejos_created") @db.DateTimeOffset
+  id_pais_geo         Int?
+  id_departamento     Int?
+  id_municipio        Int?
+  logo_url            String?               @db.NVarChar(300)
+  avisos              avisos[]
+  bancos              bancos[]
+  bloques             bloques[]
+  calles              calles[]
+  cargos              cargos[]
+  LVD_DEPARTAMENTO    LVD_DEPARTAMENTO?     @relation(fields: [id_departamento], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_complejos_departamento")
+  LVD_MUNICIPIO       LVD_MUNICIPIO?        @relation(fields: [id_municipio], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_complejos_municipio")
+  paises              paises?               @relation(fields: [id_pais], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_complejos_pais")
+  LVD_PAIS            LVD_PAIS?             @relation(fields: [id_pais_geo], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_complejos_paisgeo")
+  conciliacion_lineas conciliacion_lineas[]
+  conciliaciones      conciliaciones[]
+  cuotas              cuotas[]
+  estados_unidad      estados_unidad[]
+  gastos              gastos[]
+  items_presupuesto   items_presupuesto[]
+  pagos               pagos[]
+  pisos               pisos[]
+  presupuestos        presupuestos[]
+  propietarios        propietarios[]
+  unidades            unidades[]
+  usuarios            usuarios[]
+  config_email        config_email?
+  config_whatsapp     config_whatsapp?
+  mensajes            mensajes[]
+  gestiones_cobranza  gestiones_cobranza[]
+  cierres_periodo     cierres_periodo[]
+}
+
+model cierres_periodo {
+  id             String    @id(map: "PK_cierres_periodo") @default(dbgenerated("newid()"), map: "DF_cierre_id") @db.UniqueIdentifier
+  id_complejo    String    @db.UniqueIdentifier
+  periodo        String    @db.VarChar(7)
+  cerrado        Boolean   @default(true, map: "DF_cierre_cerrado")
+  saldo_inicial  Decimal?  @db.Decimal(12, 2)
+  total_ingresos Decimal?  @db.Decimal(12, 2)
+  total_egresos  Decimal?  @db.Decimal(12, 2)
+  saldo_final    Decimal?  @db.Decimal(12, 2)
+  cerrado_por    String?   @db.UniqueIdentifier
+  cerrado_at     DateTime? @db.DateTimeOffset
+  reabierto_por  String?   @db.UniqueIdentifier
+  reabierto_at   DateTime? @db.DateTimeOffset
+  reabierto_solicitado_por String? @db.NVarChar(150)
+  reabierto_motivo         String? @db.NVarChar(500)
+  comprobante_url          String? @db.NVarChar(300)
+  comprobante_nombre       String? @db.NVarChar(255)
+  created_at     DateTime  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_cierre_created") @db.DateTimeOffset
+  complejos      complejos @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_cierre_complejo")
+  usuario_cerrado   usuarios? @relation("cierres_cerrados", fields: [cerrado_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_cierre_cerrado_por")
+  usuario_reabierto usuarios? @relation("cierres_reabiertos", fields: [reabierto_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_cierre_reab_por")
+
+  @@unique([id_complejo, periodo], map: "UQ_cierres_periodo")
+}
+
+model gestiones_cobranza {
+  id               String    @id(map: "PK_gestiones_cobranza") @default(dbgenerated("newid()"), map: "DF_gest_id") @db.UniqueIdentifier
+  id_complejo      String    @db.UniqueIdentifier
+  id_unidad        String    @db.VarChar(10)
+  fecha            DateTime  @default(dbgenerated("CONVERT([date],sysdatetimeoffset())"), map: "DF_gest_fecha") @db.Date
+  canal            String    @db.NVarChar(20)
+  resultado        String    @db.NVarChar(30)
+  promesa_fecha    DateTime? @db.Date
+  nota             String?   @db.NVarChar(500)
+  saldo_al_momento Decimal?  @db.Decimal(10, 2)
+  registrado_por   String?   @db.UniqueIdentifier
+  created_at       DateTime  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_gest_created") @db.DateTimeOffset
+  complejos        complejos @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_gest_complejo")
+  unidades         unidades  @relation(fields: [id_unidad], references: [id], onUpdate: NoAction, map: "FK_gest_unidad")
+  usuarios         usuarios? @relation(fields: [registrado_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_gest_usuario")
+}
+
+model historial_propietarios {
+  id             String       @id(map: "PK_historial") @default(dbgenerated("newid()"), map: "DF_historial_id") @db.UniqueIdentifier
+  id_unidad      String       @db.VarChar(10)
+  id_propietario String       @db.UniqueIdentifier
+  fecha_inicio   DateTime     @db.Date
+  fecha_fin      DateTime?    @db.Date
+  motivo         String?      @db.NVarChar(60)
+  created_at     DateTime     @default(dbgenerated("sysdatetimeoffset()"), map: "DF_historial_created") @db.DateTimeOffset
+  propietarios   propietarios @relation(fields: [id_propietario], references: [id], onUpdate: NoAction, map: "FK_historial_propietario")
+  unidades       unidades     @relation(fields: [id_unidad], references: [id], onUpdate: NoAction, map: "FK_historial_unidad")
+}
+
+model paises {
+  id           Int            @id(map: "PK_paises") @db.SmallInt
+  codigo_iso2  String         @unique(map: "UQ_paises_iso2") @db.Char(2)
+  codigo_iso3  String         @unique(map: "UQ_paises_iso3") @db.Char(3)
+  nombre       String         @db.NVarChar(100)
+  nombre_en    String?        @db.NVarChar(100)
+  activo       Boolean        @default(true, map: "DF_paises_activo")
+  complejos    complejos[]
+  propietarios propietarios[]
+}
+
+model propietarios {
+  id                     String                   @id(map: "PK_propietarios") @default(dbgenerated("newid()"), map: "DF_propietarios_id") @db.UniqueIdentifier
+  id_complejo            String                   @db.UniqueIdentifier
+  id_pais                Int?                     @db.SmallInt
+  nombre                 String                   @db.NVarChar(80)
+  apellido               String                   @db.NVarChar(80)
+  dpi_nit                String?                  @db.NVarChar(30)
+  telefono               String?                  @db.NVarChar(20)
+  email                  String?                  @db.NVarChar(120)
+  direccion              String?                  @db.NVarChar(Max)
+  fecha_registro         DateTime                 @default(dbgenerated("CONVERT([date],sysdatetime())"), map: "DF_propietarios_fechareg") @db.Date
+  activo                 Boolean                  @default(true, map: "DF_propietarios_activo")
+  created_at             DateTime                 @default(dbgenerated("sysdatetimeoffset()"), map: "DF_propietarios_created") @db.DateTimeOffset
+  updated_at             DateTime                 @default(dbgenerated("sysdatetimeoffset()"), map: "DF_propietarios_updated") @db.DateTimeOffset
+  historial_propietarios historial_propietarios[]
+  usuarios               usuarios[]
+  complejos              complejos                @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_propietarios_complejo")
+  paises                 paises?                  @relation(fields: [id_pais], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_propietarios_pais")
+
+  @@index([id_complejo], map: "idx_propietarios_complejo")
+}
+
+model unidades {
+  id                      String                    @id(map: "PK_unidades") @db.VarChar(10)
+  id_complejo             String                    @db.UniqueIdentifier
+  bloque                  String?                   @db.NVarChar(50)
+  area_m2                 Decimal?                  @db.Decimal(6, 2)
+  num_piso                Int?                      @db.SmallInt
+  lat                     Decimal?                  @db.Decimal(10, 7)
+  lng                     Decimal?                  @db.Decimal(10, 7)
+  poligono                String?                   @db.NVarChar(Max)
+  activo                  Boolean                   @default(true, map: "DF_unidades_activo")
+  created_at              DateTime                  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_unidades_created") @db.DateTimeOffset
+  id_estado_unidad        String?                   @db.UniqueIdentifier
+  calle                   String?                   @db.NVarChar(150)
+  id_bloque               String?                   @db.UniqueIdentifier
+  id_calle                String?                   @db.UniqueIdentifier
+  numero_propiedad        String?                   @db.NVarChar(30)
+  id_piso                 String?                   @db.UniqueIdentifier
+  cargos                  cargos[]
+  historial_estado_unidad historial_estado_unidad[]
+  historial_propietarios  historial_propietarios[]
+  pagos                   pagos[]
+  traslados_pago          traslados_pago[]
+  bloques                 bloques?                  @relation(fields: [id_bloque], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_unidades_bloque")
+  calles                  calles?                   @relation(fields: [id_calle], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_unidades_calle")
+  complejos               complejos                 @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_unidades_complejo")
+  estados_unidad          estados_unidad?           @relation(fields: [id_estado_unidad], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_unidades_estado")
+  pisos                   pisos?                    @relation(fields: [id_piso], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_unidades_piso")
+  mensajes                mensajes[]
+  gestiones_cobranza      gestiones_cobranza[]
+
+  @@index([id_complejo], map: "idx_unidades_complejo")
+}
+
+model usuarios {
+  id              String           @id(map: "PK_usuarios") @default(dbgenerated("newid()"), map: "DF_usuarios_id") @db.UniqueIdentifier
+  id_complejo     String?          @db.UniqueIdentifier
+  id_propietario  String?          @db.UniqueIdentifier
+  nombre          String           @db.NVarChar(100)
+  email           String           @unique(map: "UQ_usuarios_email") @db.NVarChar(120)
+  password_hash   String           @db.NVarChar(Max)
+  rol             String           @default("admin", map: "DF_usuarios_rol") @db.NVarChar(20)
+  activo          Boolean          @default(true, map: "DF_usuarios_activo")
+  created_at      DateTime         @default(dbgenerated("sysdatetimeoffset()"), map: "DF_usuarios_created") @db.DateTimeOffset
+  avisos          avisos[]
+  conciliaciones  conciliaciones[]
+  gastos          gastos[]
+  pagos           pagos[]
+  mensajes              mensajes[]
+  respuestas_mensajes   respuestas_mensajes[]
+  gestiones_cobranza    gestiones_cobranza[]
+  cierres_cerrados      cierres_periodo[] @relation("cierres_cerrados")
+  cierres_reabiertos    cierres_periodo[] @relation("cierres_reabiertos")
+  complejos             complejos?       @relation(fields: [id_complejo], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_usuarios_complejo")
+  propietarios    propietarios?    @relation(fields: [id_propietario], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_usuarios_propietario")
+}
+
+model mensajes {
+  id              String       @id(map: "PK_mensajes") @default(dbgenerated("newid()"), map: "DF_mensajes_id") @db.UniqueIdentifier
+  id_complejo     String       @db.UniqueIdentifier
+  id_usuario      String       @db.UniqueIdentifier
+  id_unidad       String?      @db.VarChar(10)
+  categoria       String       @default("general", map: "DF_mensajes_categoria") @db.NVarChar(50)
+  asunto          String       @db.NVarChar(200)
+  mensaje         String       @db.NVarChar(Max)
+  respuesta       String?      @db.NVarChar(Max)
+  estado          String       @default("pendiente", map: "DF_mensajes_estado") @db.NVarChar(20)
+  respondido_por  String?      @db.NVarChar(100)
+  fecha_respuesta DateTime?    @db.DateTimeOffset
+  created_at      DateTime     @default(dbgenerated("sysdatetimeoffset()"), map: "DF_mensajes_created") @db.DateTimeOffset
+  usuarios              usuarios               @relation(fields: [id_usuario], references: [id], onUpdate: NoAction, map: "FK_mensajes_usuario")
+  complejos             complejos              @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_mensajes_complejo")
+  unidades              unidades?              @relation(fields: [id_unidad], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_mensajes_unidad")
+  respuestas_mensajes   respuestas_mensajes[]
+
+  @@index([id_complejo], map: "idx_mensajes_complejo")
+  @@index([id_usuario], map: "idx_mensajes_usuario")
+}
+
+model respuestas_mensajes {
+  id             String   @id(map: "PK_respuestas_mensajes") @default(dbgenerated("newid()"), map: "DF_respmsg_id") @db.UniqueIdentifier
+  id_mensaje     String   @db.UniqueIdentifier
+  id_usuario     String   @db.UniqueIdentifier
+  nombre_usuario String   @db.NVarChar(100)
+  texto          String   @db.NVarChar(Max)
+  created_at     DateTime @default(dbgenerated("sysdatetimeoffset()"), map: "DF_respmsg_created") @db.DateTimeOffset
+  mensajes       mensajes @relation(fields: [id_mensaje], references: [id], onUpdate: NoAction, map: "FK_respmsg_mensaje")
+  usuarios       usuarios @relation(fields: [id_usuario], references: [id], onUpdate: NoAction, map: "FK_respmsg_usuario")
+
+  @@index([id_mensaje], map: "idx_respmsg_mensaje")
+}
+
+model cargos {
+  id                String        @id(map: "PK_cargos") @default(dbgenerated("newid()"), map: "DF_cargos_id") @db.UniqueIdentifier
+  id_complejo       String        @db.UniqueIdentifier
+  id_unidad         String        @db.VarChar(10)
+  id_cuota          String?       @db.UniqueIdentifier
+  concepto          String        @db.NVarChar(100)
+  periodo_mes       DateTime      @db.Date
+  monto             Decimal       @db.Decimal(10, 2)
+  saldo             Decimal       @db.Decimal(10, 2)
+  estado            String        @default("pendiente", map: "DF_cargos_estado") @db.NVarChar(20)
+  fecha_vencimiento DateTime?     @db.Date
+  created_at        DateTime      @default(dbgenerated("sysdatetimeoffset()"), map: "DF_cargos_created") @db.DateTimeOffset
+  complejos         complejos     @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_cargos_complejo")
+  cuotas            cuotas?       @relation(fields: [id_cuota], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_cargos_cuota")
+  unidades          unidades      @relation(fields: [id_unidad], references: [id], onUpdate: NoAction, map: "FK_cargos_unidad")
+  pago_cargos       pago_cargos[]
+
+  @@unique([id_unidad, periodo_mes, concepto], map: "UQ_cargos_unidad_periodo_concepto")
+  @@index([estado], map: "idx_cargos_estado")
+  @@index([periodo_mes], map: "idx_cargos_periodo")
+}
+
+model cuotas {
+  id               String          @id(map: "PK_cuotas") @default(dbgenerated("newid()"), map: "DF_cuotas_id") @db.UniqueIdentifier
+  id_complejo      String          @db.UniqueIdentifier
+  concepto         String          @db.NVarChar(100)
+  monto            Decimal         @default(0, map: "DF_cuotas_monto") @db.Decimal(10, 2)
+  moneda           String          @default("USD", map: "DF_cuotas_moneda") @db.Char(3)
+  tipo             String          @default("fijo", map: "DF_cuotas_tipo") @db.NVarChar(20)
+  id_estado_unidad String?         @db.UniqueIdentifier
+  periodicidad     String          @default("mensual", map: "DF_cuotas_periodicidad") @db.NVarChar(20)
+  aplica_auto      Boolean         @default(true, map: "DF_cuotas_auto")
+  aplica_desde     DateTime        @default(dbgenerated("CONVERT([date],sysdatetime())"), map: "DF_cuotas_desde") @db.Date
+  aplica_hasta     DateTime?       @db.Date
+  activo           Boolean         @default(true, map: "DF_cuotas_activo")
+  created_at       DateTime        @default(dbgenerated("sysdatetimeoffset()"), map: "DF_cuotas_created") @db.DateTimeOffset
+  cargos           cargos[]
+  complejos        complejos       @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_cuotas_complejo")
+  estados_unidad   estados_unidad? @relation(fields: [id_estado_unidad], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_cuotas_estado")
+
+  @@index([id_complejo], map: "idx_cuotas_complejo")
+}
+
+model estados_unidad {
+  id                      String                    @id(map: "PK_estados_unidad") @default(dbgenerated("newid()"), map: "DF_estados_unidad_id") @db.UniqueIdentifier
+  id_complejo             String                    @db.UniqueIdentifier
+  nombre                  String                    @db.NVarChar(60)
+  orden                   Int                       @default(0, map: "DF_estados_unidad_orden") @db.SmallInt
+  activo                  Boolean                   @default(true, map: "DF_estados_unidad_activo")
+  created_at              DateTime                  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_estados_unidad_created") @db.DateTimeOffset
+  cuotas                  cuotas[]
+  complejos               complejos                 @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_estados_unidad_complejo")
+  historial_estado_unidad historial_estado_unidad[]
+  unidades                unidades[]
+
+  @@unique([id_complejo, nombre], map: "UQ_estados_unidad_nombre")
+}
+
+model historial_estado_unidad {
+  id             String         @id(map: "PK_hist_estado") @default(dbgenerated("newid()"), map: "DF_hist_estado_id") @db.UniqueIdentifier
+  id_unidad      String         @db.VarChar(10)
+  id_estado      String         @db.UniqueIdentifier
+  fecha_inicio   DateTime       @db.Date
+  fecha_fin      DateTime?      @db.Date
+  created_at     DateTime       @default(dbgenerated("sysdatetimeoffset()"), map: "DF_hist_estado_created") @db.DateTimeOffset
+  estados_unidad estados_unidad @relation(fields: [id_estado], references: [id], onUpdate: NoAction, map: "FK_hist_estado_estado")
+  unidades       unidades       @relation(fields: [id_unidad], references: [id], onUpdate: NoAction, map: "FK_hist_estado_unidad")
+}
+
+model pago_cargos {
+  id             String  @id(map: "PK_pago_cargos") @default(dbgenerated("newid()"), map: "DF_pago_cargos_id") @db.UniqueIdentifier
+  id_pago        String  @db.UniqueIdentifier
+  id_cargo       String  @db.UniqueIdentifier
+  monto_aplicado Decimal @db.Decimal(10, 2)
+  cargos         cargos  @relation(fields: [id_cargo], references: [id], onUpdate: NoAction, map: "FK_pago_cargos_cargo")
+  pagos          pagos   @relation(fields: [id_pago], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_pago_cargos_pago")
+
+  @@unique([id_pago, id_cargo], map: "UQ_pago_cargos")
+}
+
+model pagos {
+  id                  String                @id(map: "PK_pagos") @default(dbgenerated("newid()"), map: "DF_pagos_id") @db.UniqueIdentifier
+  id_complejo         String                @db.UniqueIdentifier
+  id_unidad           String                @db.VarChar(10)
+  fecha_pago          DateTime              @db.Date
+  monto_total         Decimal               @db.Decimal(10, 2)
+  metodo              String                @db.NVarChar(20)
+  banco_origen        String?               @db.NVarChar(80)
+  referencia_banco    String?               @db.NVarChar(60)
+  comprobante_url     String?               @db.NVarChar(500)
+  comprobante_nombre  String?               @db.NVarChar(200)
+  comprobante_tipo    String?               @db.NVarChar(10)
+  estado              String                @default("registrado", map: "DF_pagos_estado") @db.NVarChar(20)
+  registrado_por      String?               @db.UniqueIdentifier
+  created_at          DateTime              @default(dbgenerated("sysdatetimeoffset()"), map: "DF_pagos_created") @db.DateTimeOffset
+  id_conciliacion     String?               @db.UniqueIdentifier
+  conciliacion_lineas conciliacion_lineas[]
+  pago_cargos         pago_cargos[]
+  complejos           complejos             @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_pagos_complejo")
+  conciliaciones      conciliaciones?       @relation(fields: [id_conciliacion], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_pagos_conciliacion")
+  unidades            unidades              @relation(fields: [id_unidad], references: [id], onUpdate: NoAction, map: "FK_pagos_unidad")
+  usuarios            usuarios?             @relation(fields: [registrado_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_pagos_usuario")
+  traslados_pago      traslados_pago[]
+
+  @@index([id_complejo], map: "idx_pagos_complejo")
+  @@index([id_unidad], map: "idx_pagos_unidad")
+}
+
+model LVD_DEPARTAMENTO {
+  Id            Int             @id(map: "PK_LVD_DEPARTAMENTO")
+  Codigo        String          @db.VarChar(2)
+  Nombre        String          @db.VarChar(150)
+  Zona          String          @db.VarChar(4)
+  CodPais       String          @db.VarChar(5)
+  IdPais        Int?
+  complejos     complejos[]
+  LVD_PAIS      LVD_PAIS?       @relation(fields: [IdPais], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_LVD_depto_pais")
+  LVD_MUNICIPIO LVD_MUNICIPIO[]
+
+  @@index([IdPais], map: "idx_lvd_depto_pais")
+}
+
+model LVD_MUNICIPIO {
+  Id               Int              @id(map: "PK_LVD_MUNICIPIO")
+  Codigo           String           @db.VarChar(5)
+  Nombre           String           @db.VarChar(250)
+  Distrito         String           @db.VarChar(250)
+  Titulo           String?          @db.VarChar(150)
+  CodigoPostal     String?          @db.VarChar(50)
+  CodDepartamento  String           @db.VarChar(2)
+  IdDepartamento   Int
+  complejos        complejos[]
+  LVD_DEPARTAMENTO LVD_DEPARTAMENTO @relation(fields: [IdDepartamento], references: [Id], onUpdate: NoAction, map: "FK_LVD_muni_depto")
+
+  @@index([IdDepartamento], map: "idx_lvd_muni_depto")
+}
+
+model LVD_PAIS {
+  Id               Int                @id(map: "PK_LVD_PAIS")
+  Codigo           String             @db.VarChar(5)
+  Nombre           String             @db.VarChar(250)
+  Alfa3            String             @db.VarChar(4)
+  Alfa2            String             @db.VarChar(4)
+  Gentilicio       String             @db.VarChar(250)
+  complejos        complejos[]
+  LVD_DEPARTAMENTO LVD_DEPARTAMENTO[]
+}
+
+model gastos {
+  id                 String    @id(map: "PK_gastos") @default(dbgenerated("newid()"), map: "DF_gastos_id") @db.UniqueIdentifier
+  id_complejo        String    @db.UniqueIdentifier
+  categoria          String    @db.NVarChar(30)
+  descripcion        String    @db.NVarChar(200)
+  proveedor          String?   @db.NVarChar(100)
+  no_factura         String?   @db.NVarChar(60)
+  monto              Decimal   @db.Decimal(10, 2)
+  fecha              DateTime  @db.Date
+  metodo             String?   @db.NVarChar(20)
+  periodo_mes        DateTime  @db.Date
+  comprobante_url    String?   @db.NVarChar(500)
+  comprobante_nombre String?   @db.NVarChar(200)
+  comprobante_tipo   String?   @db.NVarChar(10)
+  registrado_por     String?   @db.UniqueIdentifier
+  id_item            String?   @db.UniqueIdentifier
+  created_at         DateTime  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_gastos_created") @db.DateTimeOffset
+  complejos          complejos @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_gastos_complejo")
+  usuarios           usuarios? @relation(fields: [registrado_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_gastos_usuario")
+  items_presupuesto  items_presupuesto? @relation(fields: [id_item], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_gastos_item")
+
+  @@index([categoria], map: "idx_gastos_categoria")
+  @@index([id_complejo], map: "idx_gastos_complejo")
+  @@index([periodo_mes], map: "idx_gastos_periodo")
+}
+
+model presupuestos {
+  id                String             @id(map: "PK_presupuestos") @default(dbgenerated("newid()"), map: "DF_presupuestos_id") @db.UniqueIdentifier
+  id_complejo       String             @db.UniqueIdentifier
+  periodo           String             @db.VarChar(7)
+  categoria         String             @db.NVarChar(30)
+  monto             Decimal            @db.Decimal(10, 2)
+  created_at        DateTime           @default(dbgenerated("sysdatetimeoffset()"), map: "DF_presupuestos_created") @db.DateTimeOffset
+  id_item           String?            @db.UniqueIdentifier
+  descripcion       String?            @db.NVarChar(200)
+  complejos         complejos          @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_presupuestos_complejo")
+  items_presupuesto items_presupuesto? @relation(fields: [id_item], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_presupuestos_item")
+}
+
+model avisos {
+  id               String    @id(map: "PK_avisos") @default(dbgenerated("newid()"), map: "DF_avisos_id") @db.UniqueIdentifier
+  id_complejo      String    @db.UniqueIdentifier
+  tipo             String    @db.NVarChar(30)
+  asunto           String?   @db.NVarChar(200)
+  mensaje          String    @db.NVarChar(Max)
+  canal            String    @db.NVarChar(20)
+  destinatarios    String?   @db.NVarChar(Max)
+  total_envios     Int       @default(0, map: "DF_avisos_envios")
+  total_entregados Int       @default(0, map: "DF_avisos_entregados")
+  total_abiertos   Int       @default(0, map: "DF_avisos_abiertos")
+  estado           String    @default("borrador", map: "DF_avisos_estado") @db.NVarChar(20)
+  programado_at    DateTime? @db.DateTimeOffset
+  enviado_at       DateTime? @db.DateTimeOffset
+  creado_por       String?   @db.UniqueIdentifier
+  created_at       DateTime  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_avisos_created") @db.DateTimeOffset
+  complejos        complejos @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_avisos_complejo")
+  usuarios         usuarios? @relation(fields: [creado_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_avisos_usuario")
+
+  @@index([id_complejo], map: "idx_avisos_complejo")
+  @@index([estado], map: "idx_avisos_estado")
+}
+
+model bloques {
+  id          String     @id(map: "PK_bloques") @default(dbgenerated("newid()"), map: "DF_bloques_id") @db.UniqueIdentifier
+  id_complejo String     @db.UniqueIdentifier
+  nombre      String     @db.NVarChar(50)
+  activo      Boolean    @default(true, map: "DF_bloques_activo")
+  created_at  DateTime   @default(dbgenerated("sysdatetimeoffset()"), map: "DF_bloques_created") @db.DateTimeOffset
+  complejos   complejos  @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_bloques_complejo")
+  unidades    unidades[]
+
+  @@unique([id_complejo, nombre], map: "UQ_bloques_nombre")
+}
+
+model calles {
+  id          String     @id(map: "PK_calles") @default(dbgenerated("newid()"), map: "DF_calles_id") @db.UniqueIdentifier
+  id_complejo String     @db.UniqueIdentifier
+  nombre      String     @db.NVarChar(150)
+  activo      Boolean    @default(true, map: "DF_calles_activo")
+  created_at  DateTime   @default(dbgenerated("sysdatetimeoffset()"), map: "DF_calles_created") @db.DateTimeOffset
+  complejos   complejos  @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_calles_complejo")
+  unidades    unidades[]
+
+  @@unique([id_complejo, nombre], map: "UQ_calles_nombre")
+}
+
+model items_presupuesto {
+  id           String         @id(map: "PK_items_presupuesto") @default(dbgenerated("newid()"), map: "DF_items_presup_id") @db.UniqueIdentifier
+  id_complejo  String         @db.UniqueIdentifier
+  categoria    String         @db.NVarChar(30)
+  nombre       String         @db.NVarChar(150)
+  orden        Int            @default(0, map: "DF_items_presup_orden") @db.SmallInt
+  activo       Boolean        @default(true, map: "DF_items_presup_activo")
+  created_at   DateTime       @default(dbgenerated("sysdatetimeoffset()"), map: "DF_items_presup_created") @db.DateTimeOffset
+  complejos    complejos      @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_items_presup_complejo")
+  presupuestos presupuestos[]
+  gastos       gastos[]
+
+  @@unique([id_complejo, categoria, nombre], map: "UQ_items_presupuesto")
+}
+
+model conciliacion_lineas {
+  id              String         @id(map: "PK_conciliacion_lineas") @default(dbgenerated("newid()"), map: "DF_cline_id") @db.UniqueIdentifier
+  id_conciliacion String         @db.UniqueIdentifier
+  id_complejo     String         @db.UniqueIdentifier
+  fecha_mov       DateTime?      @db.Date
+  monto           Decimal        @db.Decimal(12, 2)
+  referencia      String?        @db.NVarChar(100)
+  descripcion     String?        @db.NVarChar(300)
+  tipo_match      String         @default("sin_match_banco", map: "DF_cline_match") @db.NVarChar(20)
+  id_pago         String?        @db.UniqueIdentifier
+  created_at      DateTime       @default(dbgenerated("sysdatetimeoffset()"), map: "DF_cline_created") @db.DateTimeOffset
+  complejos       complejos      @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_cline_complejo")
+  conciliaciones  conciliaciones @relation(fields: [id_conciliacion], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK_cline_concil")
+  pagos           pagos?         @relation(fields: [id_pago], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_cline_pago")
+
+  @@index([id_conciliacion], map: "idx_cline_concil")
+}
+
+model conciliaciones {
+  id                  String                @id(map: "PK_conciliaciones") @default(dbgenerated("newid()"), map: "DF_concil_id") @db.UniqueIdentifier
+  id_complejo         String                @db.UniqueIdentifier
+  periodo             String                @db.VarChar(7)
+  banco               String?               @db.NVarChar(80)
+  archivo_nombre      String?               @db.NVarChar(200)
+  fecha               DateTime              @default(dbgenerated("CONVERT([date],sysdatetime())"), map: "DF_concil_fecha") @db.Date
+  estado              String                @default("borrador", map: "DF_concil_estado") @db.NVarChar(20)
+  total_banco         Decimal?              @db.Decimal(12, 2)
+  total_sistema       Decimal?              @db.Decimal(12, 2)
+  confirmado_por      String?               @db.UniqueIdentifier
+  confirmado_at       DateTime?             @db.DateTimeOffset
+  created_at          DateTime              @default(dbgenerated("sysdatetimeoffset()"), map: "DF_concil_created") @db.DateTimeOffset
+  conciliacion_lineas conciliacion_lineas[]
+  complejos           complejos             @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_concil_complejo")
+  usuarios            usuarios?             @relation(fields: [confirmado_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK_concil_usuario")
+  pagos               pagos[]
+
+  @@index([id_complejo], map: "idx_concil_complejo")
+}
+
+model pisos {
+  id          String     @id(map: "PK_pisos") @default(dbgenerated("newid()"), map: "DF_pisos_id") @db.UniqueIdentifier
+  id_complejo String     @db.UniqueIdentifier
+  nombre      String     @db.NVarChar(50)
+  activo      Boolean    @default(true, map: "DF_pisos_activo")
+  created_at  DateTime   @default(dbgenerated("sysdatetimeoffset()"), map: "DF_pisos_created") @db.DateTimeOffset
+  complejos   complejos  @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_pisos_complejo")
+  unidades    unidades[]
+
+  @@unique([id_complejo, nombre], map: "UQ_pisos_nombre")
+}
+
+model traslados_pago {
+  id                String   @id(map: "PK_traslados_pago") @default(dbgenerated("newid()"), map: "DF__traslados_pa__id__04AFB25B") @db.UniqueIdentifier
+  id_pago           String   @db.UniqueIdentifier
+  id_unidad_origen  String   @db.VarChar(10)
+  id_unidad_destino String   @db.VarChar(10)
+  justificacion     String   @db.NVarChar(500)
+  monto_total       Decimal  @db.Decimal(10, 2)
+  realizado_por     String?  @db.UniqueIdentifier
+  id_pago_origen    String?  @db.UniqueIdentifier
+  created_at        DateTime @default(dbgenerated("sysdatetimeoffset()"), map: "DF_traslados_created") @db.DateTimeOffset
+  unidades          unidades @relation(fields: [id_unidad_destino], references: [id], onUpdate: NoAction, map: "FK_traslados_destino")
+  pagos             pagos    @relation(fields: [id_pago], references: [id], onUpdate: NoAction, map: "FK_traslados_pago")
+}
+
+model bancos {
+  id          String    @id(map: "PK_bancos") @default(dbgenerated("newid()"), map: "DF__bancos__id__0B5CAFEA") @db.UniqueIdentifier
+  id_complejo String    @db.UniqueIdentifier
+  nombre      String    @db.NVarChar(100)
+  activo      Boolean   @default(true, map: "DF_bancos_activo")
+  complejos   complejos @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK__bancos__id_compl__0C50D423")
+
+  @@unique([id_complejo, nombre], map: "UQ_bancos_nombre")
+}
+
+model config_whatsapp {
+  id              String    @id(map: "PK_config_whatsapp") @default(dbgenerated("newid()"), map: "DF_config_wa_id") @db.UniqueIdentifier
+  id_complejo     String    @unique(map: "UQ_config_wa_complejo") @db.UniqueIdentifier
+  phone_number_id String    @db.NVarChar(60)
+  access_token    String    @db.NVarChar(800)
+  numero_visible  String?   @db.NVarChar(30)
+  api_version     String    @default("v21.0", map: "DF_config_wa_apiver") @db.NVarChar(10)
+  activo          Boolean   @default(true, map: "DF_config_wa_activo")
+  created_at      DateTime  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_config_wa_created") @db.DateTimeOffset
+  complejos       complejos @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_config_wa_complejo")
+}
+
+model config_email {
+  id          String    @id(map: "PK_config_email") @default(dbgenerated("newid()"), map: "DF_config_email_id") @db.UniqueIdentifier
+  id_complejo String    @unique(map: "UQ_config_email_complejo") @db.UniqueIdentifier
+  smtp_host   String    @db.NVarChar(200)
+  smtp_port   Int       @default(587) @db.SmallInt
+  smtp_secure Boolean   @default(false)
+  smtp_user   String    @db.NVarChar(200)
+  smtp_pass   String    @db.NVarChar(200)
+  from_name   String?   @db.NVarChar(100)
+  from_email  String    @db.NVarChar(200)
+  activo      Boolean   @default(true, map: "DF_config_email_activo")
+  created_at  DateTime  @default(dbgenerated("sysdatetimeoffset()"), map: "DF_config_email_created") @db.DateTimeOffset
+  complejos   complejos @relation(fields: [id_complejo], references: [id], onUpdate: NoAction, map: "FK_config_email_complejo")
+}
