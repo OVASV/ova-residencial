@@ -234,8 +234,12 @@ export default function Cobranza() {
                         </button>
                         <button
                           onClick={() => setHistorial(x)}
-                          className="inline-flex items-center gap-1 rounded-md bg-black/5 px-2 py-1 text-etiqueta font-medium text-black/55 hover:bg-black/10"
-                          title="Ver historial de gestiones"
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-etiqueta font-medium ${
+                            x.ultima_gestion
+                              ? "bg-sidebar-accent/15 text-sidebar-accent hover:bg-sidebar-accent/25"
+                              : "bg-black/5 text-black/40 hover:bg-black/10"
+                          }`}
+                          title={x.ultima_gestion ? "Ver historial de gestiones (con acciones)" : "Sin gestiones registradas"}
                         >
                           <IconHistory size={14} />
                         </button>
