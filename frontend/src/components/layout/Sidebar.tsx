@@ -49,6 +49,7 @@ const NAV_PROPIETARIO: NavItem[] = [
   { to: "/mi-estado-cuenta", label: "Estado de cuenta", icon: IconFileInvoice },
   { to: "/mi-mapa", label: "Mi ubicación", icon: IconMap2 },
   { to: "/mis-mensajes", label: "Mensajes", icon: IconMessageCircle },
+  { to: "/libro-caja", label: "Libro de caja", icon: IconCash },
   { to: "/transparencia", label: "Finanzas", icon: IconChartBar },
 ];
 
