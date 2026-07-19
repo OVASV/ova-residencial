@@ -81,7 +81,7 @@ export default function App() {
         <Route path="pagos/conciliacion" element={<RequireRole roles={FULL}><Conciliacion /></RequireRole>} />
         <Route path="pagos/traslados" element={<RequireRole roles={FULL}><TrasladosX01 /></RequireRole>} />
         <Route path="cobranza" element={<RequireRole roles={[...FULL, "directiva"]}><Cobranza /></RequireRole>} />
-        <Route path="libro-caja" element={<RequireRole roles={[...FULL, "directiva", "propietario"]}><LibroCaja /></RequireRole>} />
+        <Route path="libro-caja" element={<RequireRole roles={[...FULL, "directiva"]}><LibroCaja /></RequireRole>} />
         <Route path="cobranza/bitacora" element={<RequireRole roles={[...FULL, "directiva"]}><Bitacora /></RequireRole>} />
         <Route path="pagos/recibos" element={<RequireRole roles={FULL}><Recibos /></RequireRole>} />
         <Route path="gastos" element={<RequireRole roles={[...FULL, "directiva"]}><Gastos /></RequireRole>} />

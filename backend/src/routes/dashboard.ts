@@ -494,7 +494,15 @@ router.get("/movimientos", async (req, res) => {
     prisma.gastos.aggregate({ where: { ...complejoFiltro, fecha: { lt: periodoMes } }, _sum: { monto: true } }),
     prisma.pagos.findMany({
       where: { ...complejoFiltro, estado: { not: "anulado" }, fecha_pago: { gte: periodoMes, lt: sigMes } },
-      select: { id: true, fecha_pago: true, monto_total: true, metodo: true, referencia_banco: true, unidades: { select: { numero_propiedad: true } } },
+      select: {
+        id: true, fecha_pago: true, monto_total: true, metodo: true, referencia_banco: true,
+        unidades: {
+          select: {
+            numero_propiedad: true,
+            historial_propietarios: { where: { fecha_fin: null }, select: { propietarios: { select: { nombre: true, apellido: true } } } },
+          },
+        },
+      },
     }),
     prisma.gastos.findMany({
       where: { ...complejoFiltro, fecha: { gte: periodoMes, lt: sigMes } },
@@ -508,10 +516,13 @@ router.get("/movimientos", async (req, res) => {
   type Mov = { fecha: string; tipo: "pago" | "gasto"; descripcion: string; detalle: string | null; ingreso: number; egreso: number; orden: number };
   const movs: Mov[] = [];
   for (const p of pagosMes) {
+    const prop = p.unidades?.historial_propietarios?.[0]?.propietarios;
+    const nombreProp = prop ? `${prop.nombre} ${prop.apellido}` : null;
+    const unidad = p.unidades?.numero_propiedad;
     movs.push({
       fecha: p.fecha_pago.toISOString().slice(0, 10),
       tipo: "pago",
-      descripcion: `Pago${p.unidades?.numero_propiedad ? " — " + p.unidades.numero_propiedad : ""}`,
+      descripcion: `Pago${unidad ? " — " + unidad : ""}${nombreProp ? " — " + nombreProp : ""}`,
       detalle: p.referencia_banco ?? p.metodo ?? null,
       ingreso: r2(p.monto_total.toNumber()),
       egreso: 0,
