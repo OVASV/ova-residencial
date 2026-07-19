@@ -499,7 +499,8 @@ router.get("/movimientos", async (req, res) => {
         unidades: {
           select: {
             numero_propiedad: true,
-            historial_propietarios: { where: { fecha_fin: null }, select: { propietarios: { select: { nombre: true, apellido: true } } } },
+            // Todo el historial de dueños (con sus rangos) para elegir el vigente a la fecha del pago.
+            historial_propietarios: { select: { fecha_inicio: true, fecha_fin: true, propietarios: { select: { nombre: true, apellido: true } } } },
           },
         },
       },
@@ -516,7 +517,12 @@ router.get("/movimientos", async (req, res) => {
   type Mov = { fecha: string; tipo: "pago" | "gasto"; descripcion: string; detalle: string | null; ingreso: number; egreso: number; orden: number };
   const movs: Mov[] = [];
   for (const p of pagosMes) {
-    const prop = p.unidades?.historial_propietarios?.[0]?.propietarios;
+    // Dueño vigente en la FECHA DEL PAGO (no el actual), para reflejar quién lo pagó.
+    const hist = p.unidades?.historial_propietarios ?? [];
+    const enFecha = hist.find(
+      (h) => h.fecha_inicio <= p.fecha_pago && (h.fecha_fin == null || h.fecha_fin >= p.fecha_pago)
+    );
+    const prop = (enFecha ?? hist.find((h) => h.fecha_fin == null))?.propietarios;
     const nombreProp = prop ? `${prop.nombre} ${prop.apellido}` : null;
     const unidad = p.unidades?.numero_propiedad;
     movs.push({
