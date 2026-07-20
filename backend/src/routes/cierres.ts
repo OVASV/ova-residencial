@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../middleware/auth.js";
 import { sendBulkEmails } from "../utils/mailer.js";
-import { upload, borrarArchivo } from "../upload.js";
+import { upload, borrarArchivo, moverAComprobante } from "../upload.js";
 
 const router = Router();
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -108,6 +108,9 @@ router.post("/", requireRole("admin", "superadmin"), upload.single("archivo"), a
   // Si se re-cierra un mes que tuvo un comprobante anterior, se reemplaza.
   if (existente?.comprobante_url) borrarArchivo(existente.comprobante_url);
 
+  // Mueve el escaneo/conciliación a la carpeta "cierres" con el período (YYYY-MM) en el nombre.
+  const comprobanteUrl = moverAComprobante(req.file.filename, "cierres", periodo);
+
   const libro = await calcularLibro(idc, periodoMes);
 
   const data = {
@@ -116,7 +119,7 @@ router.post("/", requireRole("admin", "superadmin"), upload.single("archivo"), a
     total_ingresos: libro.totalIngresos,
     total_egresos: libro.totalEgresos,
     saldo_final: libro.saldoFinal,
-    comprobante_url: `/uploads/${req.file.filename}`,
+    comprobante_url: comprobanteUrl,
     comprobante_nombre: req.file.originalname,
     cerrado_por: req.user?.sub ?? null,
     cerrado_at: new Date(),

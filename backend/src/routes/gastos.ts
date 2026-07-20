@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../middleware/auth.js";
-import { upload, tipoComprobante, borrarArchivo } from "../upload.js";
+import { upload, tipoComprobante, borrarArchivo, moverAComprobante } from "../upload.js";
 import { estaPeriodoCerrado, periodoDeFecha, PERIODO_CERRADO_MSG } from "../utils/cierres.js";
 
 const router = Router();
@@ -314,10 +314,13 @@ router.post("/:id/comprobante", soloAdmin, upload.single("archivo"), async (req,
     return res.status(404).json({ message: "Gasto no encontrado" });
   }
   borrarArchivo(gasto.comprobante_url);
+  // Mueve el escaneo a la carpeta "gastos" con el período (YYYY-MM) en el nombre.
+  const etiqueta = gasto.periodo_mes.toISOString().slice(0, 7);
+  const comprobante_url = moverAComprobante(req.file.filename, "gastos", etiqueta);
   const updated = await prisma.gastos.update({
     where: { id: gasto.id },
     data: {
-      comprobante_url: `/uploads/${req.file.filename}`,
+      comprobante_url,
       comprobante_nombre: req.file.originalname,
       comprobante_tipo: tipoComprobante(req.file.mimetype),
     },

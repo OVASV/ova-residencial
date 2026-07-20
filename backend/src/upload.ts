@@ -29,8 +29,22 @@ export const upload = multer({
 
 export const tipoComprobante = (mimetype: string) => (mimetype === "application/pdf" ? "pdf" : "imagen");
 
-// Borra un archivo del disco a partir de su URL (/uploads/<archivo>). Silencioso.
+// Mueve un archivo recién subido (plano en /uploads) a una subcarpeta, renombrándolo
+// con una etiqueta legible (p. ej. el período "2023-04") para reconocerlo en auditoría.
+// Devuelve la nueva URL pública (/uploads/<subcarpeta>/<etiqueta>_<uuid>.<ext>).
+export function moverAComprobante(filename: string, subcarpeta: string, etiqueta: string): string {
+  const carpeta = subcarpeta.replace(/[^a-zA-Z0-9_-]/g, "");
+  const et = (etiqueta || "sin-fecha").replace(/[^a-zA-Z0-9_-]/g, "");
+  const dir = path.join(UPLOAD_DIR, carpeta);
+  fs.mkdirSync(dir, { recursive: true });
+  const nuevoNombre = `${et}_${filename}`;
+  fs.renameSync(path.join(UPLOAD_DIR, filename), path.join(dir, nuevoNombre));
+  return `/uploads/${carpeta}/${nuevoNombre}`;
+}
+
+// Borra un archivo del disco a partir de su URL (/uploads/... incluidas subcarpetas). Silencioso.
 export function borrarArchivo(url?: string | null) {
   if (!url) return;
-  fs.unlink(path.join(UPLOAD_DIR, path.basename(url)), () => {});
+  const rel = url.replace(/^\/+uploads\/+/, "");
+  fs.unlink(path.join(UPLOAD_DIR, rel), () => {});
 }
