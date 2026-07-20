@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { IconPrinter, IconSearch, IconFilter, IconMail, IconBrandWhatsapp } from "@tabler/icons-react";
-import { getRecibos, enviarReciboEmail, type ReciboItem } from "../../api/client";
+import { getRecibos, enviarReciboEmail, getReciboPdfLink, type ReciboItem } from "../../api/client";
 import Panel from "../../components/ui/Panel";
 import MonoAmount from "../../components/ui/MonoAmount";
 import { formatDate } from "../../utils/formatters";
@@ -98,12 +98,21 @@ export default function Recibos() {
     }
   }
 
-  function waRecibo(r: ReciboItem) {
+  async function waRecibo(r: ReciboItem) {
     if (!r.telefono) return;
-    const num = r.telefono.replace(/[^\d]/g, "");
-    const monto = Number(r.monto_total).toLocaleString("en-US", { minimumFractionDigits: 2 });
-    const msg = `Estimado/a ${r.propietario ?? ""}, adjuntamos el comprobante de su pago del ${formatDate(r.fecha_pago)} por $${monto} (${r.conceptos || "cuota"}). ¡Gracias!`;
-    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+    setEnviando(r.id);
+    try {
+      const { url } = await getReciboPdfLink(r.id);
+      const link = `${window.location.origin}${url}`;
+      const num = r.telefono.replace(/[^\d]/g, "");
+      const monto = Number(r.monto_total).toLocaleString("en-US", { minimumFractionDigits: 2 });
+      const msg = `Estimado/a ${r.propietario ?? ""}, aquí tiene su recibo de pago del ${formatDate(r.fecha_pago)} por $${monto}:\n${link}\n¡Gracias!`;
+      window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
+    } catch (e) {
+      alert((e as Error).message || "No se pudo generar el enlace del recibo");
+    } finally {
+      setEnviando(null);
+    }
   }
 
   if (loading) return <div className="py-8 text-center text-base text-black/40">Cargando…</div>;
@@ -210,8 +219,9 @@ export default function Recibos() {
                         {r.telefono ? (
                           <button
                             onClick={() => waRecibo(r)}
+                            disabled={enviando === r.id}
                             title={`Enviar por WhatsApp (${r.telefono})`}
-                            className="rounded p-1 text-black/40 hover:bg-black/5 hover:text-[#128C4B]"
+                            className="rounded p-1 text-black/40 hover:bg-black/5 hover:text-[#128C4B] disabled:opacity-40"
                           >
                             <IconBrandWhatsapp size={15} />
                           </button>

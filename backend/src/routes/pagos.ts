@@ -2,9 +2,12 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../middleware/auth.js";
-import { upload, tipoComprobante, borrarArchivo } from "../upload.js";
+import path from "node:path";
+import fs from "node:fs";
+import { upload, tipoComprobante, borrarArchivo, UPLOAD_DIR } from "../upload.js";
 import { estaPeriodoCerrado, periodoDeFecha, PERIODO_CERRADO_MSG } from "../utils/cierres.js";
 import { sendBulkEmails } from "../utils/mailer.js";
+import { generarReciboPdf, type ReciboPdfData } from "../utils/reciboPdf.js";
 
 const router = Router();
 const soloAdmin = requireRole("admin", "superadmin");
@@ -357,50 +360,91 @@ router.patch("/:id/anular", soloAdmin, async (req, res) => {
   res.json({ message: "Pago anulado", id: pago.id });
 });
 
-// POST /pagos/:id/enviar-recibo — envía el recibo por correo al propietario (o a `to`).
+// Reúne los datos de un pago y arma el objeto para generar el recibo en PDF.
+async function construirReciboData(idc: string, pagoId: string): Promise<{ data: ReciboPdfData; email: string | null } | null> {
+  const pago = await prisma.pagos.findUnique({
+    where: { id: pagoId },
+    include: {
+      pago_cargos: { include: { cargos: { select: { concepto: true } } } },
+      unidades: { select: { numero_propiedad: true, bloque: true, id_estado_unidad: true, bloques: { select: { nombre: true } }, calles: { select: { nombre: true } } } },
+    },
+  });
+  if (!pago || pago.id_complejo !== idc) return null;
+
+  const [hist, complejo, cuota] = await Promise.all([
+    prisma.historial_propietarios.findFirst({
+      where: { id_unidad: pago.id_unidad, fecha_fin: null },
+      include: { propietarios: { select: { nombre: true, apellido: true, email: true } } },
+    }),
+    prisma.complejos.findUnique({ where: { id: idc }, select: { nombre: true, logo_url: true } }),
+    pago.unidades?.id_estado_unidad
+      ? prisma.cuotas.findFirst({ where: { id_complejo: idc, activo: true, id_estado_unidad: pago.unidades.id_estado_unidad }, select: { concepto: true, monto: true } })
+      : Promise.resolve(null),
+  ]);
+
+  const logoPath = complejo?.logo_url ? path.join(UPLOAD_DIR, complejo.logo_url.replace(/^\/+uploads\/+/, "")) : null;
+
+  const data: ReciboPdfData = {
+    id: pago.id,
+    fecha_pago: pago.fecha_pago,
+    monto_total: pago.monto_total.toNumber(),
+    metodo: pago.metodo,
+    banco_origen: pago.banco_origen,
+    referencia_banco: pago.referencia_banco,
+    numero_propiedad: pago.unidades?.numero_propiedad ?? null,
+    calle: pago.unidades?.calles?.nombre ?? null,
+    bloque: pago.unidades?.bloques?.nombre ?? pago.unidades?.bloque ?? null,
+    propietario: hist ? `${hist.propietarios.nombre} ${hist.propietarios.apellido}` : null,
+    concepto: cuota?.concepto ?? pago.pago_cargos[0]?.cargos.concepto ?? "Cuota de mantenimiento",
+    cuota_monto: cuota ? cuota.monto.toNumber() : null,
+    nombre_complejo: complejo?.nombre ?? null,
+    logo_path: logoPath,
+  };
+  return { data, email: hist?.propietarios.email ?? null };
+}
+
+// POST /pagos/:id/enviar-recibo — envía el recibo por correo con el PDF adjunto.
 router.post("/:id/enviar-recibo", soloAdmin, async (req, res) => {
   const idc = complejoEscritura(req, res);
   if (!idc) return;
-  const pago = await prisma.pagos.findUnique({
-    where: { id: req.params.id },
-    include: {
-      pago_cargos: { include: { cargos: { select: { concepto: true, periodo_mes: true } } } },
-      unidades: { select: { numero_propiedad: true } },
-    },
-  });
-  if (!pago || pago.id_complejo !== idc) return res.status(404).json({ message: "Pago no encontrado" });
+  const built = await construirReciboData(idc, req.params.id);
+  if (!built) return res.status(404).json({ message: "Pago no encontrado" });
 
-  const hist = await prisma.historial_propietarios.findFirst({
-    where: { id_unidad: pago.id_unidad, fecha_fin: null },
-    include: { propietarios: { select: { nombre: true, apellido: true, email: true } } },
-  });
-  const to = (req.body?.to as string)?.trim() || hist?.propietarios.email || "";
+  const to = (req.body?.to as string)?.trim() || built.email || "";
   if (!to || !/.+@.+\..+/.test(to)) return res.status(400).json({ message: "El propietario no tiene un correo válido registrado" });
 
-  const complejo = await prisma.complejos.findUnique({ where: { id: idc }, select: { nombre: true } });
-  const nombreProp = hist ? `${hist.propietarios.nombre} ${hist.propietarios.apellido}` : "propietario";
-  const fecha = pago.fecha_pago.toISOString().slice(0, 10);
-  const monto = pago.monto_total.toNumber().toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const conceptos = pago.pago_cargos.map((pc) => pc.cargos.concepto).join(", ") || "—";
-
-  const html = `<div style="font-family:sans-serif;color:#222;line-height:1.6;max-width:520px">
-    <h2 style="color:#0C1B30;margin:0 0 2px">Recibo de pago</h2>
-    <p style="color:#085041;font-weight:600;margin:0 0 14px">${complejo?.nombre ?? "Residencial"}</p>
-    <p>Estimado/a <b>${nombreProp}</b>, confirmamos la recepción de su pago:</p>
-    <table style="border-collapse:collapse;font-size:14px;margin:10px 0 14px">
-      <tr><td style="padding:3px 16px 3px 0;color:#666">Fecha</td><td style="font-family:monospace">${fecha}</td></tr>
-      <tr><td style="padding:3px 16px 3px 0;color:#666">Propiedad</td><td>#${pago.unidades?.numero_propiedad ?? "—"}</td></tr>
-      <tr><td style="padding:3px 16px 3px 0;color:#666">Método</td><td style="text-transform:capitalize">${pago.metodo}</td></tr>
-      <tr><td style="padding:3px 16px 3px 0;color:#666">Conceptos</td><td>${conceptos}</td></tr>
-      <tr><td style="padding:3px 16px 3px 0;color:#666;font-weight:700">Monto</td><td style="font-weight:700;font-family:monospace">$${monto}</td></tr>
-    </table>
-    <p style="color:#666;font-size:13px">Gracias por su pago. Este es un comprobante generado automáticamente.</p>
+  const pdf = await generarReciboPdf(built.data);
+  const complejoNom = built.data.nombre_complejo ?? "Residencial";
+  const html = `<div style="font-family:sans-serif;color:#222;line-height:1.6">
+    <p>Estimado/a <b>${built.data.propietario ?? "propietario"}</b>, adjuntamos el recibo de su pago del <b>${built.data.fecha_pago.toISOString().slice(0, 10)}</b>.</p>
+    <p style="color:#666;font-size:13px">${complejoNom} · Comprobante generado automáticamente.</p>
   </div>`;
+  const nombreArch = `Recibo_${built.data.fecha_pago.toISOString().slice(0, 7)}_${(built.data.numero_propiedad ?? "").replace(/[^\w-]/g, "")}.pdf`;
 
-  const r = await sendBulkEmails(idc, [{ to, subject: `Recibo de pago — ${complejo?.nombre ?? "Residencial"}`, html }]);
+  const r = await sendBulkEmails(idc, [{
+    to, subject: `Recibo de pago — ${complejoNom}`, html,
+    attachments: [{ filename: nombreArch, content: pdf, contentType: "application/pdf" }],
+  }]);
   if (!r.configured) return res.status(400).json({ message: "No hay correo (SMTP) configurado. Configúralo en Configuración → Email." });
   if (r.sent === 0) return res.status(400).json({ message: "No se pudo enviar el correo. Revisa la configuración SMTP." });
   res.json({ ok: true, message: `Recibo enviado a ${to}` });
+});
+
+// POST /pagos/:id/recibo-pdf-link — genera (y guarda) el PDF del recibo y devuelve su URL pública.
+// Se usa para compartir por WhatsApp (enlace de descarga). Nombre determinístico -> reutiliza.
+router.post("/:id/recibo-pdf-link", soloAdmin, async (req, res) => {
+  const idc = complejoEscritura(req, res);
+  if (!idc) return;
+  const built = await construirReciboData(idc, req.params.id);
+  if (!built) return res.status(404).json({ message: "Pago no encontrado" });
+
+  const dir = path.join(UPLOAD_DIR, "recibos");
+  fs.mkdirSync(dir, { recursive: true });
+  const nombre = `${built.data.fecha_pago.toISOString().slice(0, 7)}_${built.data.id}.pdf`;
+  const destino = path.join(dir, nombre);
+  const pdf = await generarReciboPdf(built.data);
+  fs.writeFileSync(destino, pdf);
+  res.json({ url: `/uploads/recibos/${nombre}` });
 });
 
 /* ============================ COMPROBANTE ============================ */

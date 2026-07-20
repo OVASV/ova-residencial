@@ -430,6 +430,8 @@ export const getRecibosByIds = (ids: string[]) =>
   apiGet<RecibosResponse>(`/pagos/recibos?ids=${encodeURIComponent(ids.join(","))}`);
 export const enviarReciboEmail = (id: string, to?: string) =>
   apiPost<{ ok: boolean; message: string }>(`/pagos/${id}/enviar-recibo`, to ? { to } : {});
+export const getReciboPdfLink = (id: string) =>
+  apiPost<{ url: string }>(`/pagos/${id}/recibo-pdf-link`, {});
 export const subirComprobantePago = (id: string, file: File) =>
   uploadArchivo<Pago>(`/pagos/${id}/comprobante`, file);
 export const quitarComprobantePago = (id: string) => apiDelete(`/pagos/${id}/comprobante`);

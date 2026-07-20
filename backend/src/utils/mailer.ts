@@ -25,10 +25,16 @@ export async function getSmtpConfig(idComplejo: string): Promise<SmtpConfig | nu
   };
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
 export interface EmailPayload {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
 function buildTransporter(cfg: SmtpConfig) {
@@ -61,7 +67,7 @@ export async function sendBulkEmails(
 
   for (const e of emails) {
     try {
-      await transporter.sendMail({ from, to: e.to, subject: e.subject, html: e.html });
+      await transporter.sendMail({ from, to: e.to, subject: e.subject, html: e.html, attachments: e.attachments });
       sent++;
     } catch (err) {
       console.error("[mailer] Failed to send to", e.to, err);
