@@ -97,7 +97,7 @@ router.get("/", async (req, res) => {
           const prop = dest?.historial_propietarios[0]?.propietarios;
           return {
             id: t.id,
-            fecha: t.created_at,
+            fecha: t.fecha_traslado ?? t.created_at, // fecha de auditoría del traslado
             numero_propiedad: dest?.numero_propiedad ?? t.id_unidad_destino,
             propietario: prop ? `${prop.nombre} ${prop.apellido}` : null,
             monto: t.monto_total,
@@ -117,7 +117,7 @@ router.get("/", async (req, res) => {
         justificacion: t.justificacion,
         monto_total: t.monto_total,
         realizado_por: t.realizado_por,
-        created_at: t.created_at,
+        created_at: t.fecha_traslado ?? t.created_at, // fecha de auditoría del traslado
         pago: t.pagos,
       };
     }),
@@ -202,16 +202,20 @@ router.post("/", soloAdmin, async (req, res) => {
     return res.status(400).json({ message: "monto_trasladar excede el monto del pago" });
   }
 
+  // La fecha de pago aplicada al destino es SIEMPRE la fecha original del
+  // movimiento (no es culpa del propietario que se aplicara tarde).
   const fechaPago = pago.fecha_pago;
+  // `fecha_traslado` es solo la fecha de AUDITORÍA (cuándo se procesó el
+  // traslado). Por defecto, hoy; el usuario puede indicar otra.
   const hoy = new Date();
   hoy.setHours(23, 59, 59, 999);
-  let fechaEfectiva = fechaPago;
+  let fechaAuditoria = new Date();
   if (fecha_traslado) {
     const ft = new Date(fecha_traslado);
     if (isNaN(ft.getTime())) return res.status(400).json({ message: "fecha_traslado inválida" });
-    if (ft < fechaPago) return res.status(400).json({ message: "fecha_traslado debe ser mayor o igual a la fecha del pago" });
-    if (ft > hoy) return res.status(400).json({ message: "fecha_traslado no puede ser futura" });
-    fechaEfectiva = ft;
+    if (ft < fechaPago) return res.status(400).json({ message: "la fecha de auditoría debe ser mayor o igual a la fecha del pago" });
+    if (ft > hoy) return res.status(400).json({ message: "la fecha de auditoría no puede ser futura" });
+    fechaAuditoria = ft;
   }
 
   const esParcial = montoTrasladar < montoTotal - 0.001;
@@ -263,7 +267,7 @@ router.post("/", soloAdmin, async (req, res) => {
         data: {
           id_complejo: idc,
           id_unidad: id_unidad_destino,
-          fecha_pago: fechaEfectiva,
+          fecha_pago: fechaPago, // fecha ORIGINAL del movimiento
           monto_total: montoTrasladar,
           metodo: pago.metodo,
           banco_origen: pago.banco_origen,
@@ -293,6 +297,7 @@ router.post("/", soloAdmin, async (req, res) => {
           id_unidad_destino,
           justificacion: justificacion.trim(),
           monto_total: montoTrasladar,
+          fecha_traslado: fechaAuditoria,
           realizado_por: req.user?.sub ?? null,
         },
       });
@@ -319,6 +324,7 @@ router.post("/", soloAdmin, async (req, res) => {
           id_unidad_destino,
           justificacion: justificacion.trim(),
           monto_total: montoTrasladar,
+          fecha_traslado: fechaAuditoria,
           realizado_por: req.user?.sub ?? null,
         },
       });

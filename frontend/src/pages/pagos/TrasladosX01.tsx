@@ -34,7 +34,7 @@ export default function TrasladosX01() {
   const [busqDest, setBusqDest] = useState("");
   const [justificacion, setJustificacion] = useState("");
   const [montoTrasladar, setMontoTrasladar] = useState("");
-  const [fechaTraslado, setFechaTraslado] = useState("");
+  const [fechaTraslado, setFechaTraslado] = useState(() => new Date().toISOString().slice(0, 10));
   const [enviando, setEnviando] = useState(false);
   const [msgOk, setMsgOk] = useState("");
 
@@ -307,9 +307,9 @@ export default function TrasladosX01() {
               )}
             </div>
 
-            {/* Fecha del traslado */}
+            {/* Fecha de registro (auditoría). El pago al destino conserva la fecha original. */}
             <div className="space-y-1">
-              <label className="text-etiqueta font-medium uppercase tracking-wide text-black/45">Fecha del traslado</label>
+              <label className="text-etiqueta font-medium uppercase tracking-wide text-black/45">Fecha de registro (auditoría)</label>
               <input
                 type="date"
                 value={fechaTraslado}
@@ -318,6 +318,7 @@ export default function TrasladosX01() {
                 onChange={(e) => setFechaTraslado(e.target.value)}
                 className="w-full rounded-md border-[0.5px] border-black/15 bg-white px-3 py-2 text-sm focus:border-sidebar-accent focus:outline-none"
               />
+              <p className="text-etiqueta text-black/40">Solo para auditoría (cuándo se procesó). El pago al destino conserva su fecha original: {formatDate(modal.fecha_pago)}.</p>
             </div>
 
             {/* Propiedad destino */}

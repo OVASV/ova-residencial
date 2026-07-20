@@ -537,6 +537,7 @@ model traslados_pago {
   monto_total       Decimal  @db.Decimal(10, 2)
   realizado_por     String?  @db.UniqueIdentifier
   id_pago_origen    String?  @db.UniqueIdentifier
+  fecha_traslado    DateTime? @db.DateTimeOffset
   created_at        DateTime @default(dbgenerated("sysdatetimeoffset()"), map: "DF_traslados_created") @db.DateTimeOffset
   unidades          unidades @relation(fields: [id_unidad_destino], references: [id], onUpdate: NoAction, map: "FK_traslados_destino")
   pagos             pagos    @relation(fields: [id_pago], references: [id], onUpdate: NoAction, map: "FK_traslados_pago")
