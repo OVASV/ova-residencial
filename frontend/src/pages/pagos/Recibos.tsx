@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { IconPrinter, IconSearch, IconFilter } from "@tabler/icons-react";
-import { getRecibos, type ReciboItem } from "../../api/client";
+import { IconPrinter, IconSearch, IconFilter, IconMail, IconBrandWhatsapp } from "@tabler/icons-react";
+import { getRecibos, enviarReciboEmail, type ReciboItem } from "../../api/client";
 import Panel from "../../components/ui/Panel";
 import MonoAmount from "../../components/ui/MonoAmount";
 import { formatDate } from "../../utils/formatters";
@@ -78,8 +78,32 @@ export default function Recibos() {
 
   const hayFiltros = !!(fAnio || fMes || fMetodo || q);
 
+  const [enviando, setEnviando] = useState<string | null>(null);
+
   function imprimirRecibo(id: string) {
     window.open(`/pagos/recibo/pdf?ids=${id}`, "_blank");
+  }
+
+  async function enviarEmail(r: ReciboItem) {
+    if (!r.email) return;
+    if (!confirm(`¿Enviar el recibo por correo a ${r.propietario ?? "el propietario"} (${r.email})?`)) return;
+    setEnviando(r.id);
+    try {
+      const res = await enviarReciboEmail(r.id);
+      alert(res.message);
+    } catch (e) {
+      alert((e as Error).message || "No se pudo enviar el recibo");
+    } finally {
+      setEnviando(null);
+    }
+  }
+
+  function waRecibo(r: ReciboItem) {
+    if (!r.telefono) return;
+    const num = r.telefono.replace(/[^\d]/g, "");
+    const monto = Number(r.monto_total).toLocaleString("en-US", { minimumFractionDigits: 2 });
+    const msg = `Estimado/a ${r.propietario ?? ""}, adjuntamos el comprobante de su pago del ${formatDate(r.fecha_pago)} por $${monto} (${r.conceptos || "cuota"}). ¡Gracias!`;
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   if (loading) return <div className="py-8 text-center text-base text-black/40">Cargando…</div>;
@@ -161,13 +185,42 @@ export default function Recibos() {
                     <td className="py-2 text-black/60 max-w-[200px] truncate">{r.conceptos || "—"}</td>
                     <td className="py-2 text-right"><MonoAmount value={Number(r.monto_total)} /></td>
                     <td className="py-2">
-                      <button
-                        onClick={() => imprimirRecibo(r.id)}
-                        title="Imprimir recibo"
-                        className="rounded p-1 text-black/40 hover:bg-black/5 hover:text-[#085041]"
-                      >
-                        <IconPrinter size={15} />
-                      </button>
+                      <div className="flex items-center justify-end gap-0.5">
+                        <button
+                          onClick={() => imprimirRecibo(r.id)}
+                          title="Imprimir recibo"
+                          className="rounded p-1 text-black/40 hover:bg-black/5 hover:text-[#085041]"
+                        >
+                          <IconPrinter size={15} />
+                        </button>
+                        {r.email ? (
+                          <button
+                            onClick={() => enviarEmail(r)}
+                            disabled={enviando === r.id}
+                            title={`Enviar recibo por correo (${r.email})`}
+                            className="rounded p-1 text-black/40 hover:bg-black/5 hover:text-[#2E6DA4] disabled:opacity-40"
+                          >
+                            <IconMail size={15} />
+                          </button>
+                        ) : (
+                          <span title="Sin correo registrado" className="cursor-not-allowed p-1 text-black/15">
+                            <IconMail size={15} />
+                          </span>
+                        )}
+                        {r.telefono ? (
+                          <button
+                            onClick={() => waRecibo(r)}
+                            title={`Enviar por WhatsApp (${r.telefono})`}
+                            className="rounded p-1 text-black/40 hover:bg-black/5 hover:text-[#128C4B]"
+                          >
+                            <IconBrandWhatsapp size={15} />
+                          </button>
+                        ) : (
+                          <span title="Sin teléfono registrado" className="cursor-not-allowed p-1 text-black/15">
+                            <IconBrandWhatsapp size={15} />
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

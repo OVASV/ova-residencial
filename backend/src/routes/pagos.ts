@@ -4,6 +4,7 @@ import { prisma } from "../db/prisma.js";
 import { requireRole } from "../middleware/auth.js";
 import { upload, tipoComprobante, borrarArchivo } from "../upload.js";
 import { estaPeriodoCerrado, periodoDeFecha, PERIODO_CERRADO_MSG } from "../utils/cierres.js";
+import { sendBulkEmails } from "../utils/mailer.js";
 
 const router = Router();
 const soloAdmin = requireRole("admin", "superadmin");
@@ -110,7 +111,7 @@ router.get("/recibos", async (req, res) => {
   const result = await Promise.all(data.map(async (p) => {
     const hist = await prisma.historial_propietarios.findFirst({
       where: { id_unidad: p.id_unidad, fecha_fin: null },
-      include: { propietarios: { select: { nombre: true, apellido: true } } },
+      include: { propietarios: { select: { nombre: true, apellido: true, email: true, telefono: true } } },
     });
 
     const cuotaUnidad = cuotas.find((c) => c.id_estado_unidad === p.unidades?.id_estado_unidad);
@@ -131,6 +132,8 @@ router.get("/recibos", async (req, res) => {
       bloque: p.unidades?.bloques?.nombre ?? p.unidades?.bloque ?? null,
       calle: p.unidades?.calles?.nombre ?? null,
       propietario: hist ? `${hist.propietarios.nombre} ${hist.propietarios.apellido}` : null,
+      email: hist?.propietarios.email ?? null,
+      telefono: hist?.propietarios.telefono ?? null,
       conceptos: p.pago_cargos.map((pc) => pc.cargos.concepto).join(", "),
       cuota_asignada: cuotaUnidad ? { concepto: cuotaUnidad.concepto, monto: cuotaUnidad.monto, tipo_propiedad: estadoUnidad?.nombre ?? null } : null,
       justificacion_traslado: traslado?.justificacion ?? null,
@@ -352,6 +355,52 @@ router.patch("/:id/anular", soloAdmin, async (req, res) => {
   });
 
   res.json({ message: "Pago anulado", id: pago.id });
+});
+
+// POST /pagos/:id/enviar-recibo — envía el recibo por correo al propietario (o a `to`).
+router.post("/:id/enviar-recibo", soloAdmin, async (req, res) => {
+  const idc = complejoEscritura(req, res);
+  if (!idc) return;
+  const pago = await prisma.pagos.findUnique({
+    where: { id: req.params.id },
+    include: {
+      pago_cargos: { include: { cargos: { select: { concepto: true, periodo_mes: true } } } },
+      unidades: { select: { numero_propiedad: true } },
+    },
+  });
+  if (!pago || pago.id_complejo !== idc) return res.status(404).json({ message: "Pago no encontrado" });
+
+  const hist = await prisma.historial_propietarios.findFirst({
+    where: { id_unidad: pago.id_unidad, fecha_fin: null },
+    include: { propietarios: { select: { nombre: true, apellido: true, email: true } } },
+  });
+  const to = (req.body?.to as string)?.trim() || hist?.propietarios.email || "";
+  if (!to || !/.+@.+\..+/.test(to)) return res.status(400).json({ message: "El propietario no tiene un correo válido registrado" });
+
+  const complejo = await prisma.complejos.findUnique({ where: { id: idc }, select: { nombre: true } });
+  const nombreProp = hist ? `${hist.propietarios.nombre} ${hist.propietarios.apellido}` : "propietario";
+  const fecha = pago.fecha_pago.toISOString().slice(0, 10);
+  const monto = pago.monto_total.toNumber().toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const conceptos = pago.pago_cargos.map((pc) => pc.cargos.concepto).join(", ") || "—";
+
+  const html = `<div style="font-family:sans-serif;color:#222;line-height:1.6;max-width:520px">
+    <h2 style="color:#0C1B30;margin:0 0 2px">Recibo de pago</h2>
+    <p style="color:#085041;font-weight:600;margin:0 0 14px">${complejo?.nombre ?? "Residencial"}</p>
+    <p>Estimado/a <b>${nombreProp}</b>, confirmamos la recepción de su pago:</p>
+    <table style="border-collapse:collapse;font-size:14px;margin:10px 0 14px">
+      <tr><td style="padding:3px 16px 3px 0;color:#666">Fecha</td><td style="font-family:monospace">${fecha}</td></tr>
+      <tr><td style="padding:3px 16px 3px 0;color:#666">Propiedad</td><td>#${pago.unidades?.numero_propiedad ?? "—"}</td></tr>
+      <tr><td style="padding:3px 16px 3px 0;color:#666">Método</td><td style="text-transform:capitalize">${pago.metodo}</td></tr>
+      <tr><td style="padding:3px 16px 3px 0;color:#666">Conceptos</td><td>${conceptos}</td></tr>
+      <tr><td style="padding:3px 16px 3px 0;color:#666;font-weight:700">Monto</td><td style="font-weight:700;font-family:monospace">$${monto}</td></tr>
+    </table>
+    <p style="color:#666;font-size:13px">Gracias por su pago. Este es un comprobante generado automáticamente.</p>
+  </div>`;
+
+  const r = await sendBulkEmails(idc, [{ to, subject: `Recibo de pago — ${complejo?.nombre ?? "Residencial"}`, html }]);
+  if (!r.configured) return res.status(400).json({ message: "No hay correo (SMTP) configurado. Configúralo en Configuración → Email." });
+  if (r.sent === 0) return res.status(400).json({ message: "No se pudo enviar el correo. Revisa la configuración SMTP." });
+  res.json({ ok: true, message: `Recibo enviado a ${to}` });
 });
 
 /* ============================ COMPROBANTE ============================ */

@@ -406,6 +406,8 @@ export interface ReciboItem {
   bloque: string | null;
   calle: string | null;
   propietario: string | null;
+  email: string | null;
+  telefono: string | null;
   conceptos: string;
   cuota_asignada: { concepto: string; monto: string | number; tipo_propiedad: string | null } | null;
   justificacion_traslado: string | null;
@@ -426,6 +428,8 @@ export const getRecibos = (anio?: string, mes?: string) => {
 };
 export const getRecibosByIds = (ids: string[]) =>
   apiGet<RecibosResponse>(`/pagos/recibos?ids=${encodeURIComponent(ids.join(","))}`);
+export const enviarReciboEmail = (id: string, to?: string) =>
+  apiPost<{ ok: boolean; message: string }>(`/pagos/${id}/enviar-recibo`, to ? { to } : {});
 export const subirComprobantePago = (id: string, file: File) =>
   uploadArchivo<Pago>(`/pagos/${id}/comprobante`, file);
 export const quitarComprobantePago = (id: string) => apiDelete(`/pagos/${id}/comprobante`);
