@@ -332,24 +332,29 @@ router.post("/", soloAdmin, async (req, res) => {
 // PATCH /pagos/:id — edita datos no contables del pago (descripción, referencia,
 // banco). Bloqueado si el mes del pago está cerrado.
 router.patch("/:id", soloAdmin, async (req, res) => {
-  const pago = await prisma.pagos.findUnique({ where: { id: req.params.id } });
-  if (!pago || (req.complejoId && pago.id_complejo !== req.complejoId)) {
-    return res.status(404).json({ message: "Pago no encontrado" });
+  try {
+    const pago = await prisma.pagos.findUnique({ where: { id: req.params.id } });
+    if (!pago || (req.complejoId && pago.id_complejo !== req.complejoId)) {
+      return res.status(404).json({ message: "Pago no encontrado" });
+    }
+    if (await estaPeriodoCerrado(pago.id_complejo, periodoDeFecha(pago.fecha_pago))) {
+      return res.status(403).json({ message: PERIODO_CERRADO_MSG });
+    }
+    const { descripcion, referencia_banco, banco_origen } = req.body ?? {};
+    const data: Record<string, unknown> = {};
+    if (descripcion !== undefined) {
+      const d = String(descripcion).trim();
+      data.descripcion = d.slice(0, 200) || "Cuota de mantenimiento";
+    }
+    if (referencia_banco !== undefined) data.referencia_banco = String(referencia_banco).trim().slice(0, 60) || null;
+    if (banco_origen !== undefined) data.banco_origen = String(banco_origen).trim().slice(0, 80) || null;
+    if (Object.keys(data).length === 0) return res.status(400).json({ message: "Nada que actualizar" });
+    const updated = await prisma.pagos.update({ where: { id: pago.id }, data });
+    res.json(updated);
+  } catch (err: any) {
+    console.error("[pagos PATCH] error:", err);
+    res.status(400).json({ message: err?.message ?? "No se pudo actualizar el pago" });
   }
-  if (await estaPeriodoCerrado(pago.id_complejo, periodoDeFecha(pago.fecha_pago))) {
-    return res.status(403).json({ message: PERIODO_CERRADO_MSG });
-  }
-  const { descripcion, referencia_banco, banco_origen } = req.body ?? {};
-  const data: Record<string, unknown> = {};
-  if (descripcion !== undefined) {
-    const d = String(descripcion).trim();
-    data.descripcion = d || "Cuota de mantenimiento";
-  }
-  if (referencia_banco !== undefined) data.referencia_banco = String(referencia_banco).trim() || null;
-  if (banco_origen !== undefined) data.banco_origen = String(banco_origen).trim() || null;
-  if (Object.keys(data).length === 0) return res.status(400).json({ message: "Nada que actualizar" });
-  const updated = await prisma.pagos.update({ where: { id: pago.id }, data });
-  res.json(updated);
 });
 
 // PATCH /pagos/:id/anular — revierte el pago y restaura los saldos.
