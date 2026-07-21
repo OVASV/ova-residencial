@@ -439,7 +439,7 @@ function PagosTable({ pagos, unidades, onChange, cerrado }: { pagos: Pago[]; uni
               <th className="py-1.5 font-medium">Unidad</th>
               <th className="py-1.5 font-medium">Método</th>
               <th className="py-1.5 font-medium">Referencia</th>
-              <th className="py-1.5 font-medium">Conceptos</th>
+              <th className="py-1.5 font-medium">Descripción</th>
               <th className="py-1.5 text-right font-medium">Monto</th>
               <th className="py-1.5 font-medium">Estado</th>
               <th className="py-1.5 font-medium">Comprobante</th>
@@ -454,7 +454,7 @@ function PagosTable({ pagos, unidades, onChange, cerrado }: { pagos: Pago[]; uni
                 <td className="py-2 capitalize">{p.metodo}</td>
                 <td className="py-2 font-mono text-black/60">{p.referencia_banco ?? "—"}</td>
                 <td className="py-2 text-black/60">
-                  {p.pago_cargos?.map((pc) => pc.cargos.concepto).join(", ") ?? "—"}
+                  {p.descripcion || p.pago_cargos?.map((pc) => pc.cargos.concepto).join(", ") || "—"}
                 </td>
                 <td className="py-2 text-right"><MonoAmount value={Number(p.monto_total)} /></td>
                 <td className="py-2">
