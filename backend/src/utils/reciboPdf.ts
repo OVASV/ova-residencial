@@ -45,9 +45,9 @@ export function generarReciboPdf(r: ReciboPdfData): Promise<Buffer> {
     doc.fillColor(NAVY).font("Helvetica-Bold").fontSize(20).text("Recibo de Pago", L, 48);
     doc.font("Helvetica").fontSize(9).fillColor(GRIS)
       .text(`Fecha de emisión: ${fFecha(new Date())}`, L, 74);
-    doc.fontSize(7.5).fillColor("#9aa0a6").text("NO. DE REFERENCIA", L, 90);
+    doc.fontSize(7.5).fillColor("#9aa0a6").text("NO. DE RECIBO", L, 90);
     doc.font("Helvetica-Bold").fontSize(11).fillColor(VERDE)
-      .text(r.referencia_banco ?? r.id.slice(0, 8).toUpperCase(), L, 100);
+      .text(`REC-${r.id.slice(0, 8).toUpperCase()}`, L, 100);
 
     // Complejo + logo (derecha)
     doc.font("Helvetica-Bold").fontSize(12).fillColor(VERDE)

@@ -58,8 +58,8 @@ export default function ReciboPDF() {
             <div>
               <h1 className="text-[20px] font-bold tracking-tight text-[#0C1B30]">Recibo de Pago</h1>
               <p className="mt-0.5 text-[11px] text-gray-500">Fecha de emisión: {hoy()}</p>
-              <div className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-gray-400">No. de referencia</div>
-              <div className="font-mono text-[13px] font-semibold text-[#085041]">{r.referencia_banco ?? r.id.slice(0, 8).toUpperCase()}</div>
+              <div className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-gray-400">No. de recibo</div>
+              <div className="font-mono text-[13px] font-semibold text-[#085041]">REC-{r.id.slice(0, 8).toUpperCase()}</div>
             </div>
             <div className="flex items-center gap-3 text-right">
               <div className="text-[14px] font-semibold text-[#085041]">{nombreComplejo ?? "Residencial"}</div>
