@@ -164,7 +164,7 @@ export default function ReciboPDF() {
             <tbody>
               {/* Un solo renglón: el pago tal cual, con mes/año de la fecha del pago. */}
               <tr className="border-b border-gray-100">
-                <td className="py-2 text-[11px]">{r.cuota_asignada?.concepto ?? "Cuota de mantenimiento"}</td>
+                <td className="py-2 text-[11px]">{r.descripcion ?? r.cuota_asignada?.concepto ?? "Cuota de mantenimiento"}</td>
                 <td className="py-2 font-mono text-[11px]">{String(r.fecha_pago).slice(0, 7)}</td>
                 <td className="py-2 text-right font-mono text-[11px] text-gray-500">{formatCurrency(Number(r.cuota_asignada?.monto ?? r.monto_total))}</td>
                 <td className="py-2 text-right font-mono text-[11px] font-medium">{formatCurrency(Number(r.monto_total))}</td>

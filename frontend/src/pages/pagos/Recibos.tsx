@@ -69,6 +69,7 @@ export default function Recibos() {
           !(r.propietario?.toLowerCase().includes(s)) &&
           !(r.numero_propiedad?.toLowerCase().includes(s)) &&
           !(r.referencia_banco?.toLowerCase().includes(s)) &&
+          !(r.descripcion?.toLowerCase().includes(s)) &&
           !(r.conceptos?.toLowerCase().includes(s))
         ) return false;
       }
@@ -178,7 +179,7 @@ export default function Recibos() {
                   <th className="py-1.5 font-medium">Propietario</th>
                   <th className="py-1.5 font-medium">Método</th>
                   <th className="py-1.5 font-medium">Referencia</th>
-                  <th className="py-1.5 font-medium">Conceptos</th>
+                  <th className="py-1.5 font-medium">Descripción</th>
                   <th className="py-1.5 text-right font-medium">Monto</th>
                   <th className="py-1.5 w-10"></th>
                 </tr>
@@ -191,7 +192,7 @@ export default function Recibos() {
                     <td className="py-2">{r.propietario ?? <span className="text-black/30">—</span>}</td>
                     <td className="py-2 capitalize">{r.metodo}</td>
                     <td className="py-2 font-mono text-black/60">{r.referencia_banco ?? "—"}</td>
-                    <td className="py-2 text-black/60 max-w-[200px] truncate">{r.conceptos || "—"}</td>
+                    <td className="py-2 text-black/60 max-w-[200px] truncate">{r.descripcion || r.conceptos || "—"}</td>
                     <td className="py-2 text-right"><MonoAmount value={Number(r.monto_total)} /></td>
                     <td className="py-2">
                       <div className="flex items-center justify-end gap-0.5">

@@ -137,6 +137,7 @@ router.get("/recibos", async (req, res) => {
       propietario: hist ? `${hist.propietarios.nombre} ${hist.propietarios.apellido}` : null,
       email: hist?.propietarios.email ?? null,
       telefono: hist?.propietarios.telefono ?? null,
+      descripcion: p.descripcion ?? null,
       conceptos: p.pago_cargos.map((pc) => pc.cargos.concepto).join(", "),
       cuota_asignada: cuotaUnidad ? { concepto: cuotaUnidad.concepto, monto: cuotaUnidad.monto, tipo_propiedad: estadoUnidad?.nombre ?? null } : null,
       justificacion_traslado: traslado?.justificacion ?? null,
