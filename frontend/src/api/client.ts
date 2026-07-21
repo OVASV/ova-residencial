@@ -319,6 +319,7 @@ export interface Pago {
   metodo: MetodoPago;
   banco_origen: string | null;
   referencia_banco: string | null;
+  descripcion?: string | null;
   estado: "registrado" | "conciliado" | "anulado";
   comprobante_url?: string | null;
   comprobante_nombre?: string | null;
@@ -333,8 +334,11 @@ export interface RegistrarPagoPayload {
   monto_total?: number;
   banco_origen?: string;
   referencia_banco?: string;
+  descripcion?: string;
   aplicaciones?: { id_cargo: string; monto_aplicado?: number }[];
 }
+export const editarPago = (id: string, data: { descripcion?: string; referencia_banco?: string; banco_origen?: string }) =>
+  apiPatch<Pago>(`/pagos/${id}`, data);
 
 export interface EstadoCuenta {
   nombre_complejo?: string;

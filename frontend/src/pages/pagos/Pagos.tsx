@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconReceipt2, IconBolt, IconPlus, IconTrash, IconCashBanknote, IconArrowsLeftRight, IconPrinter, IconLock } from "@tabler/icons-react";
+import { IconReceipt2, IconBolt, IconPlus, IconTrash, IconCashBanknote, IconArrowsLeftRight, IconPrinter, IconLock, IconPencil } from "@tabler/icons-react";
 import {
   getCargos,
   generarCargos,
@@ -11,6 +11,7 @@ import {
   getEstadoCuenta,
   getPagos,
   registrarPago,
+  editarPago,
   anularPago,
   subirComprobantePago,
   quitarComprobantePago,
@@ -425,6 +426,7 @@ function CargosTable({ cargos, unidades, onChange, cerrado }: { cargos: Cargo[];
 }
 
 function PagosTable({ pagos, unidades, onChange, cerrado }: { pagos: Pago[]; unidades: Unidad[]; onChange: () => void; cerrado: boolean }) {
+  const [editar, setEditar] = useState<Pago | null>(null);
   return (
     <Panel>
       {pagos.length === 0 ? (
@@ -480,6 +482,16 @@ function PagosTable({ pagos, unidades, onChange, cerrado }: { pagos: Pago[]; uni
                   </a>
                   {p.estado !== "anulado" && !cerrado && (
                     <button
+                      onClick={() => setEditar(p)}
+                      className="text-black/40 hover:text-sidebar-accent"
+                      aria-label="Editar pago"
+                      title="Editar descripción / referencia"
+                    >
+                      <IconPencil size={15} />
+                    </button>
+                  )}
+                  {p.estado !== "anulado" && !cerrado && (
+                    <button
                       onClick={async () => {
                         if (confirm("¿Anular este pago? Se restaurarán los saldos de los cargos.")) {
                           await anularPago(p.id);
@@ -505,7 +517,64 @@ function PagosTable({ pagos, unidades, onChange, cerrado }: { pagos: Pago[]; uni
           </tfoot>
         </table>
       )}
+      {editar && (
+        <EditarPagoModal
+          pago={editar}
+          onClose={() => setEditar(null)}
+          onSaved={() => { setEditar(null); onChange(); }}
+        />
+      )}
     </Panel>
+  );
+}
+
+function EditarPagoModal({ pago, onClose, onSaved }: { pago: Pago; onClose: () => void; onSaved: () => void }) {
+  const [descripcion, setDescripcion] = useState(pago.descripcion ?? "Cuota de mantenimiento");
+  const [referencia, setReferencia] = useState(pago.referencia_banco ?? "");
+  const [banco, setBanco] = useState(pago.banco_origen ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaving(true);
+    try {
+      await editarPago(pago.id, {
+        descripcion: descripcion.trim() || "Cuota de mantenimiento",
+        referencia_banco: referencia.trim(),
+        banco_origen: banco.trim(),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title="Editar pago" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        {error && <div className="text-base text-estado-atrasado">{error}</div>}
+        <label className="block">
+          <span className={labelCls}>Descripción</span>
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Cuota de mantenimiento" className={`${inputCls} mt-1`} />
+        </label>
+        <label className="block">
+          <span className={labelCls}>Referencia</span>
+          <input value={referencia} onChange={(e) => setReferencia(e.target.value)} className={`${inputCls} mt-1`} />
+        </label>
+        <label className="block">
+          <span className={labelCls}>Banco origen</span>
+          <input value={banco} onChange={(e) => setBanco(e.target.value)} className={`${inputCls} mt-1`} />
+        </label>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" disabled={saving}>{saving ? "Guardando…" : "Guardar"}</Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -717,6 +786,7 @@ function RegistrarPagoModal({
   const [referencia, setReferencia] = useState("");
   const [banco, setBanco] = useState("");
   const [bancos, setBancos] = useState<Catalogo[]>([]);
+  const [descripcion, setDescripcion] = useState("Cuota de mantenimiento");
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [montoLibre, setMontoLibre] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -761,6 +831,7 @@ function RegistrarPagoModal({
         metodo,
         banco_origen: banco.trim() || undefined,
         referencia_banco: referencia.trim() || undefined,
+        descripcion: descripcion.trim() || undefined,
         monto_total: Number(montoLibre),
       });
       onSaved();
@@ -851,6 +922,16 @@ function RegistrarPagoModal({
             </select>
           </label>
         </div>
+
+        <label className="block">
+          <span className={labelCls}>Descripción</span>
+          <input
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder="Cuota de mantenimiento"
+            className={`${inputCls} mt-1`}
+          />
+        </label>
 
         <div className="flex items-center justify-between border-t-[0.5px] border-black/10 pt-3">
           <div className="text-base">

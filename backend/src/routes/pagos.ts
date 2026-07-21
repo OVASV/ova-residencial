@@ -185,11 +185,13 @@ router.post("/", soloAdmin, async (req, res) => {
     comprobante_nombre,
     comprobante_tipo,
     aplicaciones,
+    descripcion,
   } = req.body ?? {};
 
   if (!id_unidad || !fecha_pago || !metodo) {
     return res.status(400).json({ message: "id_unidad, fecha_pago y metodo son requeridos" });
   }
+  const descPago = (typeof descripcion === "string" && descripcion.trim()) ? descripcion.trim() : "Cuota de mantenimiento";
   if (!["transferencia", "efectivo", "cheque"].includes(metodo)) {
     return res.status(400).json({ message: "metodo inválido" });
   }
@@ -240,6 +242,7 @@ router.post("/", soloAdmin, async (req, res) => {
           metodo,
           banco_origen: banco_origen || null,
           referencia_banco: referencia_banco || null,
+          descripcion: descPago,
           comprobante_url: comprobante_url || null,
           comprobante_nombre: comprobante_nombre || null,
           comprobante_tipo: comprobante_tipo || null,
@@ -302,6 +305,7 @@ router.post("/", soloAdmin, async (req, res) => {
         metodo,
         banco_origen: banco_origen || null,
         referencia_banco: referencia_banco || null,
+        descripcion: descPago,
         comprobante_url: comprobante_url || null,
         comprobante_nombre: comprobante_nombre || null,
         comprobante_tipo: comprobante_tipo || null,
@@ -323,6 +327,29 @@ router.post("/", soloAdmin, async (req, res) => {
   });
 
   res.status(201).json({ ...pago, cargos_saldados: detalle.length });
+});
+
+// PATCH /pagos/:id — edita datos no contables del pago (descripción, referencia,
+// banco). Bloqueado si el mes del pago está cerrado.
+router.patch("/:id", soloAdmin, async (req, res) => {
+  const pago = await prisma.pagos.findUnique({ where: { id: req.params.id } });
+  if (!pago || (req.complejoId && pago.id_complejo !== req.complejoId)) {
+    return res.status(404).json({ message: "Pago no encontrado" });
+  }
+  if (await estaPeriodoCerrado(pago.id_complejo, periodoDeFecha(pago.fecha_pago))) {
+    return res.status(403).json({ message: PERIODO_CERRADO_MSG });
+  }
+  const { descripcion, referencia_banco, banco_origen } = req.body ?? {};
+  const data: Record<string, unknown> = {};
+  if (descripcion !== undefined) {
+    const d = String(descripcion).trim();
+    data.descripcion = d || "Cuota de mantenimiento";
+  }
+  if (referencia_banco !== undefined) data.referencia_banco = String(referencia_banco).trim() || null;
+  if (banco_origen !== undefined) data.banco_origen = String(banco_origen).trim() || null;
+  if (Object.keys(data).length === 0) return res.status(400).json({ message: "Nada que actualizar" });
+  const updated = await prisma.pagos.update({ where: { id: pago.id }, data });
+  res.json(updated);
 });
 
 // PATCH /pagos/:id/anular — revierte el pago y restaura los saldos.
@@ -395,7 +422,7 @@ async function construirReciboData(idc: string, pagoId: string): Promise<{ data:
     calle: pago.unidades?.calles?.nombre ?? null,
     bloque: pago.unidades?.bloques?.nombre ?? pago.unidades?.bloque ?? null,
     propietario: hist ? `${hist.propietarios.nombre} ${hist.propietarios.apellido}` : null,
-    concepto: cuota?.concepto ?? pago.pago_cargos[0]?.cargos.concepto ?? "Cuota de mantenimiento",
+    concepto: pago.descripcion ?? cuota?.concepto ?? pago.pago_cargos[0]?.cargos.concepto ?? "Cuota de mantenimiento",
     cuota_monto: cuota ? cuota.monto.toNumber() : null,
     nombre_complejo: complejo?.nombre ?? null,
     logo_path: logoPath,

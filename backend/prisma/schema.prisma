@@ -317,6 +317,7 @@ model pagos {
   metodo              String                @db.NVarChar(20)
   banco_origen        String?               @db.NVarChar(80)
   referencia_banco    String?               @db.NVarChar(60)
+  descripcion         String?               @db.NVarChar(200)
   comprobante_url     String?               @db.NVarChar(500)
   comprobante_nombre  String?               @db.NVarChar(200)
   comprobante_tipo    String?               @db.NVarChar(10)
