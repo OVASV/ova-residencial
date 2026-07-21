@@ -346,7 +346,14 @@ router.patch("/:id", soloAdmin, async (req, res) => {
       const d = String(descripcion).trim();
       data.descripcion = d.slice(0, 200) || "Cuota de mantenimiento";
     }
-    if (referencia_banco !== undefined) data.referencia_banco = String(referencia_banco).trim().slice(0, 60) || null;
+    if (referencia_banco !== undefined) {
+      const ref = String(referencia_banco).trim().slice(0, 60);
+      // La base exige referencia para transferencia/cheque (CK_pagos_referencia).
+      if (!ref && pago.metodo !== "efectivo") {
+        return res.status(400).json({ message: "La referencia es obligatoria para pagos por transferencia o cheque." });
+      }
+      data.referencia_banco = ref || null;
+    }
     if (banco_origen !== undefined) data.banco_origen = String(banco_origen).trim().slice(0, 80) || null;
     if (Object.keys(data).length === 0) return res.status(400).json({ message: "Nada que actualizar" });
     const updated = await prisma.pagos.update({ where: { id: pago.id }, data });
