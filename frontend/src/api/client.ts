@@ -1168,6 +1168,7 @@ export interface MiUnidad {
   bloque: string | null;
   calle: string | null;
   estado: string | null;
+  saldo?: number;
   lat: number | null;
   lng: number | null;
   poligono: string | null;

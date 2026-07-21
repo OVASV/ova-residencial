@@ -24,15 +24,23 @@ router.get("/mis-unidades", soloPropietario, async (req, res) => {
     },
   });
 
-  const unidades = historial.map((h) => ({
-    id: h.unidades.id,
-    numero_propiedad: h.unidades.numero_propiedad,
-    bloque: h.unidades.bloques?.nombre ?? h.unidades.bloque,
-    calle: h.unidades.calles?.nombre ?? null,
-    estado: h.unidades.estados_unidad?.nombre ?? null,
-    lat: h.unidades.lat ? Number(h.unidades.lat) : null,
-    lng: h.unidades.lng ? Number(h.unidades.lng) : null,
-    poligono: h.unidades.poligono,
+  const unidades = await Promise.all(historial.map(async (h) => {
+    const [cargosAgg, pagosAgg] = await Promise.all([
+      prisma.cargos.aggregate({ where: { id_unidad: h.unidades.id, estado: { not: "anulado" } }, _sum: { monto: true } }),
+      prisma.pagos.aggregate({ where: { id_unidad: h.unidades.id, estado: { not: "anulado" } }, _sum: { monto_total: true } }),
+    ]);
+    const saldo = Math.round(((cargosAgg._sum.monto?.toNumber() ?? 0) - (pagosAgg._sum.monto_total?.toNumber() ?? 0)) * 100) / 100;
+    return {
+      id: h.unidades.id,
+      numero_propiedad: h.unidades.numero_propiedad,
+      bloque: h.unidades.bloques?.nombre ?? h.unidades.bloque,
+      calle: h.unidades.calles?.nombre ?? null,
+      estado: h.unidades.estados_unidad?.nombre ?? null,
+      saldo, // > 0 debe, <= 0 al día / a favor
+      lat: h.unidades.lat ? Number(h.unidades.lat) : null,
+      lng: h.unidades.lng ? Number(h.unidades.lng) : null,
+      poligono: h.unidades.poligono,
+    };
   }));
 
   res.json(unidades);

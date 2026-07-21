@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconFileInvoice, IconMap2, IconMessageCircle, IconChartBar, IconCalendarClock, IconAlertTriangle, IconArrowRight } from "@tabler/icons-react";
+import { IconFileInvoice, IconMap2, IconMessageCircle, IconChartBar, IconCalendarClock, IconAlertTriangle, IconArrowRight, IconCoin, IconCircleCheck } from "@tabler/icons-react";
 import { getMisUnidades, getMisPromesas, type MiUnidad, type PromesaActiva } from "../../api/client";
 import Panel from "../../components/ui/Panel";
-import { formatDate } from "../../utils/formatters";
+import { formatDate, formatCurrency } from "../../utils/formatters";
 
 export default function PortalInicio() {
   const [unidades, setUnidades] = useState<MiUnidad[]>([]);
@@ -19,11 +19,19 @@ export default function PortalInicio() {
 
   if (loading) return <div className="py-8 text-center text-base text-black/40">Cargando…</div>;
 
+  const conPromesa = new Set(promesas.map((p) => p.id_unidad));
+  // Unidades que deben pero NO tienen promesa activa (esas ya salen en su banner).
+  const pendientes = unidades.filter((u) => (u.saldo ?? 0) > 0 && !conPromesa.has(u.id));
+  const totalPendiente = Math.round(pendientes.reduce((s, u) => s + (u.saldo ?? 0), 0) * 100) / 100;
+  const alDia = unidades.length > 0 && unidades.every((u) => (u.saldo ?? 0) <= 0);
+
   return (
     <div className="space-y-5">
       {promesas.map((p) => (
         <PromesaBanner key={p.id_unidad} promesa={p} />
       ))}
+      {totalPendiente > 0 && <SaldoPendienteBanner total={totalPendiente} unidades={pendientes} />}
+      {alDia && promesas.length === 0 && <AlDiaBanner />}
 
       <div>
         <h1 className="text-lg font-semibold">Bienvenido</h1>
@@ -41,7 +49,16 @@ export default function PortalInicio() {
                 to={`/mi-estado-cuenta?unidad=${encodeURIComponent(u.id)}`}
                 className="rounded-lg border-[0.5px] border-black/10 bg-white p-4 shadow-sm hover:border-sidebar-accent/30 hover:shadow transition"
               >
-                <div className="text-base font-semibold">Propiedad #{u.numero_propiedad ?? u.id}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-base font-semibold">Propiedad #{u.numero_propiedad ?? u.id}</div>
+                  {u.saldo !== undefined && (
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-etiqueta font-semibold ${
+                      u.saldo > 0 ? "bg-estado-atrasado/12 text-estado-atrasado" : "bg-estado-pagado/12 text-estado-pagado"
+                    }`}>
+                      {u.saldo > 0 ? `Debe ${formatCurrency(u.saldo)}` : "Al día"}
+                    </span>
+                  )}
+                </div>
                 <div className="mt-1 text-etiqueta text-black/50">
                   {[u.bloque, u.calle].filter(Boolean).join(" · ") || "—"}
                 </div>
@@ -97,6 +114,44 @@ export default function PortalInicio() {
             <div className="text-etiqueta text-black/40">Recaudación, gastos y saldo en caja</div>
           </div>
         </Link>
+      </div>
+    </div>
+  );
+}
+
+function SaldoPendienteBanner({ total, unidades }: { total: number; unidades: MiUnidad[] }) {
+  const to = unidades.length === 1 ? `/mi-estado-cuenta?unidad=${encodeURIComponent(unidades[0].id)}` : "/mi-estado-cuenta";
+  return (
+    <div className="flex items-start gap-3.5 rounded-xl border-[0.5px] border-estado-atrasado/30 bg-gradient-to-r from-estado-atrasado/[0.09] to-transparent p-4 shadow-sm sm:p-5">
+      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-estado-atrasado/15 text-estado-atrasado">
+        <IconCoin size={22} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-base font-bold text-estado-atrasado">Tienes un saldo pendiente</div>
+        <p className="mt-1 text-base leading-snug text-black/70">
+          Debes <b>{formatCurrency(total)}</b>
+          {unidades.length === 1
+            ? <> por tu propiedad <b>#{unidades[0].numero_propiedad ?? ""}</b>.</>
+            : <> en {unidades.length} de tus propiedades.</>}{" "}
+          Ponte al día para evitar recargos.
+        </p>
+        <Link to={to} className="mt-2.5 inline-flex items-center gap-1 text-etiqueta font-semibold text-estado-atrasado hover:underline">
+          Ver mi estado de cuenta <IconArrowRight size={14} />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function AlDiaBanner() {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border-[0.5px] border-estado-pagado/30 bg-gradient-to-r from-estado-pagado/[0.08] to-transparent p-4 shadow-sm">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-estado-pagado/15 text-estado-pagado">
+        <IconCircleCheck size={20} />
+      </div>
+      <div>
+        <div className="text-base font-semibold text-estado-pagado">Estás al día</div>
+        <p className="text-etiqueta text-black/50">No tienes saldos pendientes. ¡Gracias!</p>
       </div>
     </div>
   );
