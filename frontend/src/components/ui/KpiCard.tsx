@@ -39,8 +39,10 @@ export default function KpiCard({
   /** Abre el link en una pestaña nueva (p. ej. reporte PDF). */
   newTab?: boolean;
 }) {
-  const pct = subValue && subValue > 0 ? Math.round((value / subValue) * 100) : null;
   const diff = subValue !== undefined ? Math.round((subValue - value) * 100) / 100 : null;
+  // El % describe el monto de la diferencia (falta/disponible/excede), no el
+  // valor principal — así coincide con la etiqueta que lleva al lado.
+  const pct = subValue && subValue > 0 && diff !== null ? Math.round((Math.abs(diff) / subValue) * 100) : null;
 
   // cobro: diff>0 = falta por cobrar (rojo). gasto: diff<0 = excede presupuesto (rojo).
   let diffText: string | null = null;
