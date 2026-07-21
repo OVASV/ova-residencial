@@ -413,6 +413,7 @@ export interface ReciboItem {
   email: string | null;
   telefono: string | null;
   descripcion: string | null;
+  tipo: string | null;
   conceptos: string;
   cuota_asignada: { concepto: string; monto: string | number; tipo_propiedad: string | null } | null;
   justificacion_traslado: string | null;

@@ -13,6 +13,7 @@ export interface ReciboPdfData {
   bloque: string | null;
   propietario: string | null;
   concepto: string; // concepto principal (cuota asignada o "Cuota de mantenimiento")
+  tipo: string | null; // tipo de propiedad (estado de unidad): casa, en construcción, airbnb, etc.
   cuota_monto: number | null;
   nombre_complejo: string | null;
   logo_path: string | null; // ruta absoluta en disco, opcional
@@ -79,13 +80,15 @@ export function generarReciboPdf(r: ReciboPdfData): Promise<Buffer> {
     y += 76;
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#9aa0a6");
     doc.text("CONCEPTO", L, y);
-    doc.text("CUOTA", L + W * 0.6, y, { width: W * 0.2, align: "right" });
+    doc.text("TIPO", L + W * 0.42, y);
+    doc.text("CUOTA ASIGNADA", L + W * 0.6, y, { width: W * 0.2, align: "right" });
     doc.text("MONTO APLICADO", L + W * 0.8, y, { width: W * 0.2, align: "right" });
     y += 12;
     doc.moveTo(L, y).lineTo(R, y).lineWidth(1).strokeColor(VERDE).opacity(0.25).stroke().opacity(1);
     y += 8;
     doc.font("Helvetica").fontSize(10).fillColor("#333");
-    doc.text(r.concepto, L, y, { width: W * 0.55 });
+    doc.text(r.concepto, L, y, { width: W * 0.4 });
+    doc.text(r.tipo ?? "—", L + W * 0.42, y, { width: W * 0.16 });
     doc.fillColor(GRIS).text(money(r.cuota_monto ?? r.monto_total), L + W * 0.6, y, { width: W * 0.2, align: "right" });
     doc.fillColor("#333").text(money(r.monto_total), L + W * 0.8, y, { width: W * 0.2, align: "right" });
     y += 24;

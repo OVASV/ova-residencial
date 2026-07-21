@@ -146,7 +146,8 @@ export default function ReciboPDF() {
             <thead>
               <tr className="border-b-2 border-[#085041]/20 text-left text-[9px] font-semibold uppercase tracking-wider text-gray-400">
                 <th className="py-2">Concepto</th>
-                <th className="py-2 text-right">Cuota</th>
+                <th className="py-2">Tipo</th>
+                <th className="py-2 text-right">Cuota asignada</th>
                 <th className="py-2 text-right">Monto aplicado</th>
               </tr>
             </thead>
@@ -154,6 +155,7 @@ export default function ReciboPDF() {
               {/* Un solo renglón: el pago tal cual. */}
               <tr className="border-b border-gray-100">
                 <td className="py-2 text-[11px]">{r.descripcion ?? r.cuota_asignada?.concepto ?? "Cuota de mantenimiento"}</td>
+                <td className="py-2 text-[11px] capitalize">{r.tipo ?? r.cuota_asignada?.tipo_propiedad ?? "—"}</td>
                 <td className="py-2 text-right font-mono text-[11px] text-gray-500">{formatCurrency(Number(r.cuota_asignada?.monto ?? r.monto_total))}</td>
                 <td className="py-2 text-right font-mono text-[11px] font-medium">{formatCurrency(Number(r.monto_total))}</td>
               </tr>

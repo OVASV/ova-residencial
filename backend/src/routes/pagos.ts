@@ -119,7 +119,7 @@ router.get("/recibos", async (req, res) => {
 
     const cuotaUnidad = cuotas.find((c) => c.id_estado_unidad === p.unidades?.id_estado_unidad);
     const traslado = p.traslados_pago.length > 0 ? p.traslados_pago[0] : null;
-    const estadoUnidad = cuotaUnidad && p.unidades?.id_estado_unidad
+    const estadoUnidad = p.unidades?.id_estado_unidad
       ? await prisma.estados_unidad.findUnique({ where: { id: p.unidades.id_estado_unidad }, select: { nombre: true } })
       : null;
 
@@ -138,6 +138,7 @@ router.get("/recibos", async (req, res) => {
       email: hist?.propietarios.email ?? null,
       telefono: hist?.propietarios.telefono ?? null,
       descripcion: p.descripcion ?? null,
+      tipo: estadoUnidad?.nombre ?? null,
       conceptos: p.pago_cargos.map((pc) => pc.cargos.concepto).join(", "),
       cuota_asignada: cuotaUnidad ? { concepto: cuotaUnidad.concepto, monto: cuotaUnidad.monto, tipo_propiedad: estadoUnidad?.nombre ?? null } : null,
       justificacion_traslado: traslado?.justificacion ?? null,
@@ -406,7 +407,7 @@ async function construirReciboData(idc: string, pagoId: string): Promise<{ data:
     where: { id: pagoId },
     include: {
       pago_cargos: { include: { cargos: { select: { concepto: true } } } },
-      unidades: { select: { numero_propiedad: true, bloque: true, id_estado_unidad: true, bloques: { select: { nombre: true } }, calles: { select: { nombre: true } } } },
+      unidades: { select: { numero_propiedad: true, bloque: true, id_estado_unidad: true, bloques: { select: { nombre: true } }, calles: { select: { nombre: true } }, estados_unidad: { select: { nombre: true } } } },
     },
   });
   if (!pago || pago.id_complejo !== idc) return null;
@@ -436,6 +437,7 @@ async function construirReciboData(idc: string, pagoId: string): Promise<{ data:
     bloque: pago.unidades?.bloques?.nombre ?? pago.unidades?.bloque ?? null,
     propietario: hist ? `${hist.propietarios.nombre} ${hist.propietarios.apellido}` : null,
     concepto: pago.descripcion ?? cuota?.concepto ?? pago.pago_cargos[0]?.cargos.concepto ?? "Cuota de mantenimiento",
+    tipo: pago.unidades?.estados_unidad?.nombre ?? null,
     cuota_monto: cuota ? cuota.monto.toNumber() : null,
     nombre_complejo: complejo?.nombre ?? null,
     logo_path: logoPath,
