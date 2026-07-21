@@ -26,10 +26,6 @@ const LINEA = "#e2e5e2";
 const money = (n: number) =>
   "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fFecha = (d: Date) => d.toISOString().slice(0, 10);
-const mesAnio = (d: Date) => {
-  const s = d.toLocaleDateString("es", { month: "long", year: "numeric", timeZone: "UTC" });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-};
 
 // Genera el recibo en PDF (Buffer), con un diseño equivalente al de impresión.
 export function generarReciboPdf(r: ReciboPdfData): Promise<Buffer> {
@@ -73,28 +69,24 @@ export function generarReciboPdf(r: ReciboPdfData): Promise<Buffer> {
     // ---- Detalle del pago ----
     y += 74;
     doc.roundedRect(L, y, W, 58, 4).fillColor("#f7f8f7").fill();
-    const c4 = W / 4;
-    campo(doc, "FECHA DE PAGO", fFecha(r.fecha_pago), L + 14, y + 12, c4 - 16);
-    campo(doc, "MES / AÑO", mesAnio(r.fecha_pago), L + c4 + 6, y + 12, c4 - 16);
-    campo(doc, "MÉTODO", cap(r.metodo), L + c4 * 2 + 6, y + 12, c4 - 16);
-    campo(doc, "BANCO ORIGEN", r.banco_origen ?? "—", L + c4 * 3 + 6, y + 12, c4 - 16);
+    const c3 = W / 3;
+    campo(doc, "FECHA DE PAGO", fFecha(r.fecha_pago), L + 14, y + 12, c3 - 16);
+    campo(doc, "MÉTODO", cap(r.metodo), L + c3 + 6, y + 12, c3 - 16);
+    campo(doc, "BANCO ORIGEN", r.banco_origen ?? "—", L + c3 * 2 + 6, y + 12, c3 - 16);
     if (r.referencia_banco) campo(doc, "REFERENCIA BANCARIA", r.referencia_banco, L + 14, y + 34, W - 28);
 
     // ---- Conceptos (una sola línea, como el recibo de impresión) ----
     y += 76;
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#9aa0a6");
     doc.text("CONCEPTO", L, y);
-    doc.text("PERÍODO", L + W * 0.42, y);
-    doc.text("CUOTA", L + W * 0.62, y, { width: W * 0.18, align: "right" });
+    doc.text("CUOTA", L + W * 0.6, y, { width: W * 0.2, align: "right" });
     doc.text("MONTO APLICADO", L + W * 0.8, y, { width: W * 0.2, align: "right" });
     y += 12;
     doc.moveTo(L, y).lineTo(R, y).lineWidth(1).strokeColor(VERDE).opacity(0.25).stroke().opacity(1);
     y += 8;
     doc.font("Helvetica").fontSize(10).fillColor("#333");
-    doc.text(r.concepto, L, y, { width: W * 0.4 });
-    doc.font("Helvetica").fontSize(10).fillColor("#333")
-      .text(fFecha(r.fecha_pago).slice(0, 7), L + W * 0.42, y);
-    doc.fillColor(GRIS).text(money(r.cuota_monto ?? r.monto_total), L + W * 0.62, y, { width: W * 0.18, align: "right" });
+    doc.text(r.concepto, L, y, { width: W * 0.55 });
+    doc.fillColor(GRIS).text(money(r.cuota_monto ?? r.monto_total), L + W * 0.6, y, { width: W * 0.2, align: "right" });
     doc.fillColor("#333").text(money(r.monto_total), L + W * 0.8, y, { width: W * 0.2, align: "right" });
     y += 24;
     doc.moveTo(L, y).lineTo(R, y).lineWidth(0.5).strokeColor(LINEA).stroke();

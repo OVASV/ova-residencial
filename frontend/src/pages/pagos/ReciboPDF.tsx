@@ -6,12 +6,6 @@ import { formatDate, formatCurrency } from "../../utils/formatters";
 
 const hoy = () => new Date().toLocaleDateString("es-GT", { year: "numeric", month: "long", day: "numeric" });
 
-function mesAnio(fecha: string) {
-  const d = new Date(fecha);
-  const s = d.toLocaleDateString("es", { month: "long", year: "numeric" });
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 export default function ReciboPDF() {
   const [params] = useSearchParams();
   const ids = params.get("ids")?.split(",") ?? [];
@@ -117,14 +111,10 @@ export default function ReciboPDF() {
 
           {/* Detalle del pago */}
           <div className="mb-5 rounded-md border border-gray-200 bg-gray-50 p-4">
-            <div className="grid grid-cols-4 gap-x-6 gap-y-2">
+            <div className="grid grid-cols-3 gap-x-6 gap-y-2">
               <div>
                 <Label>Fecha de pago</Label>
                 <Value>{formatDate(r.fecha_pago)}</Value>
-              </div>
-              <div>
-                <Label>Mes / Año del pago</Label>
-                <Value>{mesAnio(r.fecha_pago)}</Value>
               </div>
               <div>
                 <Label>Método</Label>
@@ -156,16 +146,14 @@ export default function ReciboPDF() {
             <thead>
               <tr className="border-b-2 border-[#085041]/20 text-left text-[9px] font-semibold uppercase tracking-wider text-gray-400">
                 <th className="py-2">Concepto</th>
-                <th className="py-2">Período</th>
                 <th className="py-2 text-right">Cuota</th>
                 <th className="py-2 text-right">Monto aplicado</th>
               </tr>
             </thead>
             <tbody>
-              {/* Un solo renglón: el pago tal cual, con mes/año de la fecha del pago. */}
+              {/* Un solo renglón: el pago tal cual. */}
               <tr className="border-b border-gray-100">
                 <td className="py-2 text-[11px]">{r.descripcion ?? r.cuota_asignada?.concepto ?? "Cuota de mantenimiento"}</td>
-                <td className="py-2 font-mono text-[11px]">{String(r.fecha_pago).slice(0, 7)}</td>
                 <td className="py-2 text-right font-mono text-[11px] text-gray-500">{formatCurrency(Number(r.cuota_asignada?.monto ?? r.monto_total))}</td>
                 <td className="py-2 text-right font-mono text-[11px] font-medium">{formatCurrency(Number(r.monto_total))}</td>
               </tr>
