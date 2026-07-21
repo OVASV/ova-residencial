@@ -38,6 +38,57 @@ router.get("/mis-unidades", soloPropietario, async (req, res) => {
   res.json(unidades);
 });
 
+// GET /portal/mis-promesas — promesas de pago ACTIVAS del propietario.
+// Una promesa está activa si: la unidad aún tiene saldo > 0 Y no se ha
+// registrado ningún pago DESPUÉS de la promesa (la promesa "vale hasta el
+// próximo pago", así no se reactiva una promesa ya cumplida).
+router.get("/mis-promesas", soloPropietario, async (req, res) => {
+  const idProp = req.user!.id_propietario;
+  if (!idProp) return res.status(400).json({ message: "Usuario sin propietario asignado" });
+
+  const vinculos = await prisma.historial_propietarios.findMany({
+    where: { id_propietario: idProp, fecha_fin: null },
+    select: { id_unidad: true, unidades: { select: { numero_propiedad: true } } },
+  });
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const promesas: { id_unidad: string; numero_propiedad: string | null; promesa_fecha: string; vencida: boolean; saldo: number }[] = [];
+
+  for (const v of vinculos) {
+    const [cargosAgg, pagosAgg, ultimaPromesa] = await Promise.all([
+      prisma.cargos.aggregate({ where: { id_unidad: v.id_unidad, estado: { not: "anulado" } }, _sum: { monto: true } }),
+      prisma.pagos.aggregate({ where: { id_unidad: v.id_unidad, estado: { not: "anulado" } }, _sum: { monto_total: true } }),
+      prisma.gestiones_cobranza.findFirst({
+        where: { id_unidad: v.id_unidad, resultado: "promesa_pago", promesa_fecha: { not: null } },
+        orderBy: { created_at: "desc" },
+        select: { promesa_fecha: true, created_at: true },
+      }),
+    ]);
+    const saldo = Math.round(((cargosAgg._sum.monto?.toNumber() ?? 0) - (pagosAgg._sum.monto_total?.toNumber() ?? 0)) * 100) / 100;
+    if (saldo <= 0 || !ultimaPromesa?.promesa_fecha) continue;
+
+    // ¿Hubo algún pago registrado DESPUÉS de la promesa? -> promesa cumplida/consumida.
+    const pagoPosterior = await prisma.pagos.count({
+      where: { id_unidad: v.id_unidad, estado: { not: "anulado" }, created_at: { gt: ultimaPromesa.created_at } },
+    });
+    if (pagoPosterior > 0) continue;
+
+    const pf = new Date(ultimaPromesa.promesa_fecha);
+    promesas.push({
+      id_unidad: v.id_unidad,
+      numero_propiedad: v.unidades?.numero_propiedad ?? null,
+      promesa_fecha: pf.toISOString().slice(0, 10),
+      vencida: pf < hoy,
+      saldo,
+    });
+  }
+
+  // Más urgente primero (vencidas, luego por fecha).
+  promesas.sort((a, b) => Number(b.vencida) - Number(a.vencida) || a.promesa_fecha.localeCompare(b.promesa_fecha));
+  res.json(promesas);
+});
+
 // GET /portal/estado-cuenta/:idUnidad — estado de cuenta de una unidad del propietario.
 router.get("/estado-cuenta/:idUnidad", soloPropietario, async (req, res) => {
   const idProp = req.user!.id_propietario;

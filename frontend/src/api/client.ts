@@ -1213,6 +1213,14 @@ export interface DetalleMesData {
 export const getTransparencia = () => apiGet<TransparenciaData>("/portal/transparencia");
 export const getDetalleMes = (periodo: string) => apiGet<DetalleMesData>(`/portal/transparencia/${periodo}`);
 export const getMisUnidades = () => apiGet<MiUnidad[]>("/portal/mis-unidades");
+export interface PromesaActiva {
+  id_unidad: string;
+  numero_propiedad: string | null;
+  promesa_fecha: string;
+  vencida: boolean;
+  saldo: number;
+}
+export const getMisPromesas = () => apiGet<PromesaActiva[]>("/portal/mis-promesas");
 export const getPortalEstadoCuenta = (idUnidad: string) =>
   apiGet<EstadoCuenta>(`/portal/estado-cuenta/${encodeURIComponent(idUnidad)}`);
 export const getMisMensajes = () => apiGet<MensajePortal[]>("/portal/mensajes");

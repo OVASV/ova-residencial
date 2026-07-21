@@ -1,21 +1,30 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconFileInvoice, IconMap2, IconMessageCircle, IconChartBar } from "@tabler/icons-react";
-import { getMisUnidades, type MiUnidad } from "../../api/client";
+import { IconFileInvoice, IconMap2, IconMessageCircle, IconChartBar, IconCalendarClock, IconAlertTriangle, IconArrowRight } from "@tabler/icons-react";
+import { getMisUnidades, getMisPromesas, type MiUnidad, type PromesaActiva } from "../../api/client";
 import Panel from "../../components/ui/Panel";
+import { formatDate } from "../../utils/formatters";
 
 export default function PortalInicio() {
   const [unidades, setUnidades] = useState<MiUnidad[]>([]);
+  const [promesas, setPromesas] = useState<PromesaActiva[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getMisUnidades().then(setUnidades).catch(() => {}).finally(() => setLoading(false));
+    Promise.all([
+      getMisUnidades().then(setUnidades).catch(() => {}),
+      getMisPromesas().then(setPromesas).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="py-8 text-center text-base text-black/40">Cargando…</div>;
 
   return (
     <div className="space-y-5">
+      {promesas.map((p) => (
+        <PromesaBanner key={p.id_unidad} promesa={p} />
+      ))}
+
       <div>
         <h1 className="text-lg font-semibold">Bienvenido</h1>
         <p className="text-base text-black/50">Portal del propietario — consulta tu información</p>
@@ -87,6 +96,54 @@ export default function PortalInicio() {
             <div className="text-base font-semibold">Finanzas</div>
             <div className="text-etiqueta text-black/40">Recaudación, gastos y saldo en caja</div>
           </div>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function PromesaBanner({ promesa }: { promesa: PromesaActiva }) {
+  const vencida = promesa.vencida;
+  const to = `/mi-estado-cuenta?unidad=${encodeURIComponent(promesa.id_unidad)}`;
+  return (
+    <div
+      className={`flex items-start gap-3.5 rounded-xl border-[0.5px] p-4 shadow-sm sm:p-5 ${
+        vencida
+          ? "border-estado-atrasado/30 bg-gradient-to-r from-estado-atrasado/[0.09] to-transparent"
+          : "border-estado-pendiente/40 bg-gradient-to-r from-estado-pendiente/[0.10] to-transparent"
+      }`}
+    >
+      <div
+        className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${
+          vencida ? "bg-estado-atrasado/15 text-estado-atrasado" : "bg-estado-pendiente/20 text-estado-pendiente"
+        }`}
+      >
+        {vencida ? <IconAlertTriangle size={22} /> : <IconCalendarClock size={22} />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className={`text-base font-bold ${vencida ? "text-estado-atrasado" : "text-estado-pendiente"}`}>
+          {vencida ? "Tu promesa de pago venció" : "Tienes una promesa de pago pendiente"}
+        </div>
+        <p className="mt-1 text-base leading-snug text-black/70">
+          {vencida ? (
+            <>
+              Te comprometiste a pagar el <b>{formatDate(promesa.promesa_fecha)}</b> y esa fecha ya pasó.
+              Por favor regulariza el pago de tu propiedad <b>#{promesa.numero_propiedad ?? ""}</b>.
+            </>
+          ) : (
+            <>
+              Te comprometiste a pagar el <b>{formatDate(promesa.promesa_fecha)}</b> por tu propiedad{" "}
+              <b>#{promesa.numero_propiedad ?? ""}</b>. ¡Gracias por tu compromiso!
+            </>
+          )}
+        </p>
+        <Link
+          to={to}
+          className={`mt-2.5 inline-flex items-center gap-1 text-etiqueta font-semibold hover:underline ${
+            vencida ? "text-estado-atrasado" : "text-estado-pendiente"
+          }`}
+        >
+          Ver mi estado de cuenta <IconArrowRight size={14} />
         </Link>
       </div>
     </div>
