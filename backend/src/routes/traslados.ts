@@ -82,10 +82,17 @@ router.get("/", async (req, res) => {
   res.json({
     pendientes: pagosX01.map((p) => {
       const trs = trasladosPorPago.get(p.id) ?? [];
+      // saldo = lo que aún queda en X01 (monto_total ya viene reducido por los
+      // traslados parciales). original = saldo + lo ya trasladado.
+      const saldo = p.monto_total.toNumber();
+      const trasladado = trs.reduce((s, t) => s + t.monto_total.toNumber(), 0);
+      const montoOriginal = Math.round((saldo + trasladado) * 100) / 100;
       return {
         id: p.id,
         fecha_pago: p.fecha_pago,
         monto_total: p.monto_total,
+        monto_original: montoOriginal,
+        saldo,
         metodo: p.metodo,
         banco_origen: p.banco_origen,
         referencia_banco: p.referencia_banco,

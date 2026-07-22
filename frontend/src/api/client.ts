@@ -993,6 +993,8 @@ export interface PagoX01 {
   id: string;
   fecha_pago: string;
   monto_total: string | number;
+  monto_original: number;
+  saldo: number;
   metodo: MetodoPago;
   banco_origen: string | null;
   referencia_banco: string | null;

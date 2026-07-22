@@ -149,7 +149,8 @@ export default function TrasladosX01() {
               <thead>
                 <tr className="border-b-[0.5px] border-black/10 text-left text-etiqueta uppercase tracking-wider text-black/45">
                   <th className="px-3 py-2">Fecha</th>
-                  <th className="px-3 py-2">Monto</th>
+                  <th className="px-3 py-2 text-right">Monto original</th>
+                  <th className="px-3 py-2 text-right">Saldo</th>
                   <th className="px-3 py-2">Método</th>
                   <th className="px-3 py-2">Referencia</th>
                   <th className="px-3 py-2">Banco</th>
@@ -179,7 +180,10 @@ export default function TrasladosX01() {
                           ) : <span className="inline-block w-[14px]" />}
                           {formatDate(p.fecha_pago)}
                         </td>
-                        <td className="px-3 py-2.5"><MonoAmount value={Number(p.monto_total)} /></td>
+                        <td className="px-3 py-2.5 text-right text-black/60"><MonoAmount value={Number(p.monto_original)} /></td>
+                        <td className="px-3 py-2.5 text-right">
+                          <MonoAmount value={Number(p.saldo)} className={Number(p.saldo) < Number(p.monto_original) ? "font-semibold text-sidebar-accent" : ""} />
+                        </td>
                         <td className="px-3 py-2.5 capitalize text-black/60">{p.metodo}</td>
                         <td className="px-3 py-2.5 font-mono text-black/60">{p.referencia_banco || "—"}</td>
                         <td className="px-3 py-2.5 text-black/60">{p.banco_origen || "—"}</td>
@@ -194,7 +198,7 @@ export default function TrasladosX01() {
                       </tr>
                       {isOpen && hasTrs && (
                         <tr>
-                          <td colSpan={6} className="px-3 pb-3 pt-0">
+                          <td colSpan={7} className="px-3 pb-3 pt-0">
                             <div className="ml-6 rounded-md border-[0.5px] border-black/10 bg-black/[0.02]">
                               <div className="px-3 py-1.5 text-etiqueta font-medium uppercase tracking-wider text-black/40 border-b-[0.5px] border-black/10">
                                 Traslados realizados desde este depósito
