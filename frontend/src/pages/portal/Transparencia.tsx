@@ -79,12 +79,16 @@ export default function Transparencia() {
         <p className="text-base text-black/50">{data.nombre_complejo} — Información abierta para todos los propietarios</p>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <KpiCard label="Saldo en caja" value={kpis.saldo_caja} tone={kpis.saldo_caja >= 0 ? "text-emerald-600" : "text-estado-atrasado"} />
-        <KpiCard label="Recaudado este mes" value={kpis.recaudado_mes} tone="text-[#085041]" />
-        <KpiCard label="Gastado este mes" value={kpis.gastado_mes} tone="text-black/70" />
+      {/* KPIs — el saldo en caja se explica solo: inicial + recaudado − gastos */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard label="Saldo inicial del mes" value={kpis.saldo_inicial} tone="text-black/70" />
+        <KpiCard label="+ Recaudado este mes" value={kpis.recaudado_mes} tone="text-[#085041]" />
+        <KpiCard label="− Gastado este mes" value={kpis.gastado_mes} tone="text-estado-atrasado" />
+        <KpiCard label="= Saldo en caja" value={kpis.saldo_caja} tone={kpis.saldo_caja >= 0 ? "text-emerald-600" : "text-estado-atrasado"} />
       </div>
+      <p className="-mt-2 text-etiqueta text-black/45">
+        Saldo inicial del mes + lo recaudado − lo gastado = saldo en caja. Así puedes verificar de dónde sale el saldo.
+      </p>
 
       {/* Segmentación de deuda — idéntico al Dashboard */}
       {seg && (
@@ -168,15 +172,15 @@ export default function Transparencia() {
             <thead>
               <tr className="border-b border-black/15 text-left text-black/45">
                 <th className="py-1.5 font-medium">Mes</th>
+                <th className="py-1.5 text-right font-medium">Saldo inicial</th>
                 <th className="py-1.5 text-right font-medium">Recaudado</th>
                 <th className="py-1.5 text-right font-medium">Gastado</th>
-                <th className="py-1.5 text-right font-medium">Diferencia</th>
+                <th className="py-1.5 text-right font-medium">Saldo final</th>
                 <th className="w-8"></th>
               </tr>
             </thead>
             <tbody>
               {meses.map((m) => {
-                const diff = m.recaudado - m.gastado;
                 const abierto = mesAbierto === m.periodo;
                 return (
                   <>
@@ -186,10 +190,11 @@ export default function Transparencia() {
                       onClick={() => toggleMes(m.periodo)}
                     >
                       <td className="py-2 capitalize">{nombreMes(m.periodo)} {m.periodo.split("-")[0]}</td>
+                      <td className="py-2 text-right font-mono text-black/50">{formatCurrency(m.saldo_inicial)}</td>
                       <td className="py-2 text-right font-mono text-[#085041]">{formatCurrency(m.recaudado)}</td>
-                      <td className="py-2 text-right font-mono text-black/60">{formatCurrency(m.gastado)}</td>
-                      <td className={`py-2 text-right font-mono font-medium ${diff >= 0 ? "text-emerald-600" : "text-estado-atrasado"}`}>
-                        {diff >= 0 ? "+" : ""}{formatCurrency(diff)}
+                      <td className="py-2 text-right font-mono text-estado-atrasado">{formatCurrency(m.gastado)}</td>
+                      <td className={`py-2 text-right font-mono font-semibold ${m.saldo_final >= 0 ? "text-emerald-600" : "text-estado-atrasado"}`}>
+                        {formatCurrency(m.saldo_final)}
                       </td>
                       <td className="py-2 text-center text-black/30">
                         {abierto ? <IconChevronUp size={15} /> : <IconChevronDown size={15} />}
@@ -197,7 +202,7 @@ export default function Transparencia() {
                     </tr>
                     {abierto && (
                       <tr key={`${m.periodo}-detail`}>
-                        <td colSpan={5} className="bg-surface/50 px-4 py-3">
+                        <td colSpan={6} className="bg-surface/50 px-4 py-3">
                           {loadingDetalle ? (
                             <div className="py-2 text-center text-etiqueta text-black/40">Cargando…</div>
                           ) : detalleMes ? (

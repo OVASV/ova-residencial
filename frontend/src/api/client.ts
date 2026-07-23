@@ -1202,8 +1202,8 @@ export interface MensajeAdmin extends MensajePortal {
 
 export interface TransparenciaData {
   nombre_complejo: string;
-  kpis: { saldo_caja: number; recaudado_mes: number; gastado_mes: number };
-  meses: { periodo: string; recaudado: number; gastado: number }[];
+  kpis: { saldo_inicial: number; saldo_caja: number; recaudado_mes: number; gastado_mes: number };
+  meses: { periodo: string; recaudado: number; gastado: number; saldo_inicial: number; saldo_final: number }[];
   categorias_mes: { categoria: string; monto: number; items: { descripcion: string; proveedor: string | null; monto: number }[] }[];
   segmentos_deuda: { id: string; count: number; total: number }[];
 }

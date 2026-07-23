@@ -285,8 +285,8 @@ router.get("/transparencia", async (req, res) => {
     }),
   ]);
 
-  // Agrupar por mes
-  const porMes = meses.map((m) => {
+  // Agrupar por mes (recaudado y gastado)
+  const baseMes = meses.map((m) => {
     const [y, mo] = m.split("-").map(Number);
     const recaudado = pagos
       .filter((p) => {
@@ -301,6 +301,19 @@ router.get("/transparencia", async (req, res) => {
       })
       .reduce((s, g) => s + g.monto.toNumber(), 0);
     return { periodo: m, recaudado: Math.round(recaudado * 100) / 100, gastado: Math.round(gastado * 100) / 100 };
+  });
+
+  // Saldo acumulado ANTES del rango (base para el saldo inicial de cada mes).
+  const [pagosAntes, gastosAntes] = await Promise.all([
+    prisma.pagos.aggregate({ where: { id_complejo: complejoId, estado: { not: "anulado" }, fecha_pago: { lt: inicioRango } }, _sum: { monto_total: true } }),
+    prisma.gastos.aggregate({ where: { id_complejo: complejoId, fecha: { lt: inicioRango } }, _sum: { monto: true } }),
+  ]);
+  let corriente = Math.round(((pagosAntes._sum.monto_total?.toNumber() ?? 0) - (gastosAntes._sum.monto?.toNumber() ?? 0)) * 100) / 100;
+  // Saldo corriente mes a mes: inicial + recaudado − gastado = final (se arrastra).
+  const porMes = baseMes.map((m) => {
+    const saldo_inicial = corriente;
+    corriente = Math.round((corriente + m.recaudado - m.gastado) * 100) / 100;
+    return { ...m, saldo_inicial, saldo_final: corriente };
   });
 
   // Gastos por categoría del mes actual
@@ -321,31 +334,16 @@ router.get("/transparencia", async (req, res) => {
     .map(([categoria, v]) => ({ categoria, monto: Math.round(v.total * 100) / 100, items: v.items }))
     .sort((a, b) => b.monto - a.monto);
 
-  // Totales acumulados (todo el historial)
-  const [totalRecaudado, totalGastado] = await Promise.all([
-    prisma.pagos.aggregate({
-      where: { id_complejo: complejoId, estado: { not: "anulado" } },
-      _sum: { monto_total: true },
-    }),
-    prisma.gastos.aggregate({
-      where: { id_complejo: complejoId },
-      _sum: { monto: true },
-    }),
-  ]);
-
-  const recaudadoTotal = totalRecaudado._sum.monto_total?.toNumber() ?? 0;
-  const gastadoTotal = totalGastado._sum.monto?.toNumber() ?? 0;
-  const saldoCaja = Math.round((recaudadoTotal - gastadoTotal) * 100) / 100;
-
-  const recaudadoMesActual = porMes[porMes.length - 1].recaudado;
-  const gastadoMesActual = porMes[porMes.length - 1].gastado;
+  const ultimo = porMes[porMes.length - 1];
 
   res.json({
     nombre_complejo: complejo?.nombre ?? "Residencial",
     kpis: {
-      saldo_caja: saldoCaja,
-      recaudado_mes: recaudadoMesActual,
-      gastado_mes: gastadoMesActual,
+      // saldo inicial del mes + recaudado − gastado = saldo en caja (cuadra siempre)
+      saldo_inicial: ultimo.saldo_inicial,
+      recaudado_mes: ultimo.recaudado,
+      gastado_mes: ultimo.gastado,
+      saldo_caja: ultimo.saldo_final, // = acumulado total; ver saldoCaja de referencia
     },
     meses: porMes,
     categorias_mes: categorias,
