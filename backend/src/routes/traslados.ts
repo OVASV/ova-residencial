@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { prisma } from "../db/prisma.js";
 import { requireRole } from "../middleware/auth.js";
+import { estaPeriodoCerrado, periodoDeFecha, PERIODO_CERRADO_MSG } from "../utils/cierres.js";
 
 const router = Router();
 const soloAdmin = requireRole("admin", "superadmin");
@@ -342,6 +343,60 @@ router.post("/", soloAdmin, async (req, res) => {
   } catch (err: any) {
     console.error("Error en traslado:", err);
     res.status(500).json({ message: err.message ?? "Error interno al trasladar" });
+  }
+});
+
+// POST /traslados/:id/revertir — deshace un traslado: el dinero regresa a X01
+// y se restauran los cargos del destino. Bloqueado si el mes del pago está cerrado.
+router.post("/:id/revertir", soloAdmin, async (req, res) => {
+  const idc = complejoEscritura(req, res);
+  if (!idc) return;
+  try {
+    const traslado = await prisma.traslados_pago.findUnique({
+      where: { id: req.params.id },
+      include: { pagos: { include: { pago_cargos: { include: { cargos: true } } } } },
+    });
+    if (!traslado || traslado.pagos.id_complejo !== idc) {
+      return res.status(404).json({ message: "Traslado no encontrado" });
+    }
+    const destino = traslado.pagos; // pago del destino (o el reasignado en traslado total)
+    if (await estaPeriodoCerrado(idc, periodoDeFecha(destino.fecha_pago))) {
+      return res.status(403).json({ message: PERIODO_CERRADO_MSG });
+    }
+    // Parcial: se creó un pago nuevo en el destino. Total: se reasignó el mismo pago.
+    const esParcial = traslado.id_pago_origen != null && traslado.id_pago_origen !== traslado.id_pago;
+
+    await prisma.$transaction(async (tx) => {
+      // Restaurar los cargos que el pago del destino había saldado.
+      for (const pc of destino.pago_cargos) {
+        const cargo = pc.cargos;
+        const restaurado = r2(cargo.saldo.toNumber() + pc.monto_aplicado.toNumber());
+        await tx.cargos.update({
+          where: { id: cargo.id },
+          data: { saldo: restaurado, estado: restaurado >= cargo.monto.toNumber() ? "pendiente" : "parcial" },
+        });
+      }
+      await tx.pago_cargos.deleteMany({ where: { id_pago: destino.id } });
+
+      if (esParcial) {
+        // Devolver el monto al depósito de X01 y eliminar el pago del destino.
+        await tx.pagos.update({
+          where: { id: traslado.id_pago_origen! },
+          data: { monto_total: { increment: traslado.monto_total } },
+        });
+        await tx.traslados_pago.delete({ where: { id: traslado.id } }); // FK -> antes de borrar el pago
+        await tx.pagos.delete({ where: { id: destino.id } });
+      } else {
+        // Traslado total: reasignar el pago de vuelta a X01 (especiales).
+        await tx.pagos.update({ where: { id: destino.id }, data: { id_unidad: traslado.id_unidad_origen } });
+        await tx.traslados_pago.delete({ where: { id: traslado.id } });
+      }
+    });
+
+    res.json({ message: "Traslado revertido: el monto regresó a especiales (X01)" });
+  } catch (err: any) {
+    console.error("Error al revertir traslado:", err);
+    res.status(500).json({ message: err.message ?? "Error al revertir el traslado" });
   }
 });
 

@@ -3,6 +3,7 @@ import {
   getTraslados,
   getUnidadesDestino,
   trasladarPago,
+  revertirTraslado,
   type PagoX01,
   type TrasladoHistorial,
   type UnidadDestino,
@@ -15,6 +16,7 @@ import {
   IconX,
   IconChevronDown,
   IconChevronRight,
+  IconArrowBackUp,
 } from "@tabler/icons-react";
 import Panel from "../../components/ui/Panel";
 import Modal from "../../components/ui/Modal";
@@ -55,6 +57,16 @@ export default function TrasladosX01() {
   };
 
   useEffect(() => { cargar(); }, []);
+
+  const onRevertir = async (t: TrasladoHistorial) => {
+    if (!confirm(`¿Revertir este traslado de ${Number(t.monto_total).toLocaleString("en-US", { minimumFractionDigits: 2 })} a ${t.numero_propiedad}?\n\nEl monto regresará a Especiales (X01) y se restaurará el saldo de esa propiedad. Podrás volver a trasladarlo con el valor correcto.`)) return;
+    try {
+      await revertirTraslado(t.id);
+      await cargar();
+    } catch (e: any) {
+      alert(e.message || "No se pudo revertir el traslado");
+    }
+  };
 
   const abrirModal = async (pago: PagoX01) => {
     setModal(pago);
@@ -249,6 +261,7 @@ export default function TrasladosX01() {
                   <th className="px-3 py-2">Destino</th>
                   <th className="px-3 py-2">Propietario</th>
                   <th className="px-3 py-2">Justificación</th>
+                  <th className="px-3 py-2 text-right">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -259,6 +272,15 @@ export default function TrasladosX01() {
                     <td className="px-3 py-2.5">{t.numero_propiedad}</td>
                     <td className="px-3 py-2.5 text-black/60">{t.propietario || "—"}</td>
                     <td className="px-3 py-2.5 text-black/50 max-w-[300px] truncate">{t.justificacion}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <button
+                        onClick={() => onRevertir(t)}
+                        title="Revertir traslado (el monto regresa a X01)"
+                        className="inline-flex items-center gap-1 rounded-md border-[0.5px] border-estado-atrasado/30 px-2 py-1 text-etiqueta font-medium text-estado-atrasado hover:bg-estado-atrasado/10"
+                      >
+                        <IconArrowBackUp size={14} /> Revertir
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

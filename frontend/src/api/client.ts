@@ -1046,6 +1046,7 @@ export interface TrasladoPayload {
 export const getTraslados = () => apiGet<TrasladosData>("/traslados");
 export const getUnidadesDestino = () => apiGet<UnidadDestino[]>("/traslados/unidades-destino");
 export const trasladarPago = (payload: TrasladoPayload) => apiPost<{ message: string }>("/traslados", payload);
+export const revertirTraslado = (id: string) => apiPost<{ message: string }>(`/traslados/${id}/revertir`, {});
 
 // ── Config Email (SMTP por complejo) ──
 export interface ConfigEmail {
