@@ -339,6 +339,7 @@ export interface RegistrarPagoPayload {
 }
 export const editarPago = (id: string, data: { descripcion?: string; referencia_banco?: string; banco_origen?: string }) =>
   apiPatch<Pago>(`/pagos/${id}`, data);
+export const reactivarPago = (id: string) => apiPatch<{ message: string; id: string }>(`/pagos/${id}/reactivar`, {});
 
 export interface EstadoCuenta {
   nombre_complejo?: string;

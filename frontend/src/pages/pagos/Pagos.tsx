@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { IconReceipt2, IconBolt, IconPlus, IconTrash, IconCashBanknote, IconArrowsLeftRight, IconPrinter, IconLock, IconPencil } from "@tabler/icons-react";
+import { IconReceipt2, IconBolt, IconPlus, IconTrash, IconCashBanknote, IconArrowsLeftRight, IconPrinter, IconLock, IconPencil, IconRotateClockwise2 } from "@tabler/icons-react";
 import {
   getCargos,
   generarCargos,
@@ -13,6 +13,7 @@ import {
   registrarPago,
   editarPago,
   anularPago,
+  reactivarPago,
   subirComprobantePago,
   quitarComprobantePago,
   getCuotas,
@@ -502,6 +503,24 @@ function PagosTable({ pagos, unidades, onChange, cerrado }: { pagos: Pago[]; uni
                       aria-label="Anular pago"
                     >
                       <IconTrash size={16} />
+                    </button>
+                  )}
+                  {p.estado === "anulado" && !cerrado && (
+                    <button
+                      onClick={async () => {
+                        if (confirm("¿Reactivar este pago? Se volverá a aplicar a los cargos y quedará como registrado.")) {
+                          try {
+                            await reactivarPago(p.id);
+                            onChange();
+                          } catch (e) {
+                            alert((e as Error).message);
+                          }
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border-[0.5px] border-estado-pagado/40 px-2 py-1 text-etiqueta font-medium text-estado-pagado hover:bg-estado-pagado/10"
+                      title="Reactivar pago anulado"
+                    >
+                      <IconRotateClockwise2 size={14} /> Reactivar
                     </button>
                   )}
                 </td>

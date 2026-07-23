@@ -401,6 +401,40 @@ router.patch("/:id/anular", soloAdmin, async (req, res) => {
   res.json({ message: "Pago anulado", id: pago.id });
 });
 
+// PATCH /pagos/:id/reactivar — reactiva un pago anulado por error: vuelve a
+// aplicar el pago a sus cargos y lo deja como "registrado". Bloqueado si el mes
+// del pago está cerrado.
+router.patch("/:id/reactivar", soloAdmin, async (req, res) => {
+  const pago = await prisma.pagos.findUnique({
+    where: { id: req.params.id },
+    include: { pago_cargos: { include: { cargos: true } } },
+  });
+  if (!pago || (req.complejoId && pago.id_complejo !== req.complejoId)) {
+    return res.status(404).json({ message: "Pago no encontrado" });
+  }
+  if (pago.estado !== "anulado") {
+    return res.status(409).json({ message: "El pago no está anulado" });
+  }
+  if (await estaPeriodoCerrado(pago.id_complejo, periodoDeFecha(pago.fecha_pago))) {
+    return res.status(403).json({ message: PERIODO_CERRADO_MSG });
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Volver a aplicar el pago a sus cargos (reduce saldo, inverso de anular).
+    for (const pc of pago.pago_cargos) {
+      const cargo = pc.cargos;
+      const nuevoSaldo = r2(Math.max(0, cargo.saldo.toNumber() - pc.monto_aplicado.toNumber()));
+      await tx.cargos.update({
+        where: { id: cargo.id },
+        data: { saldo: nuevoSaldo, estado: nuevoSaldo <= 0 ? "pagado" : "parcial" },
+      });
+    }
+    await tx.pagos.update({ where: { id: pago.id }, data: { estado: "registrado" } });
+  });
+
+  res.json({ message: "Pago reactivado", id: pago.id });
+});
+
 // Reúne los datos de un pago y arma el objeto para generar el recibo en PDF.
 async function construirReciboData(idc: string, pagoId: string): Promise<{ data: ReciboPdfData; email: string | null } | null> {
   const pago = await prisma.pagos.findUnique({
