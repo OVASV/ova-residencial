@@ -96,12 +96,16 @@ export default function Configuracion() {
             Usuarios
           </TabBtn>
         )}
-        <TabBtn active={tab === "email"} onClick={() => setTab("email")}>
-          Email
-        </TabBtn>
-        <TabBtn active={tab === "whatsapp"} onClick={() => setTab("whatsapp")}>
-          WhatsApp
-        </TabBtn>
+        {esSuper && (
+          <TabBtn active={tab === "email"} onClick={() => setTab("email")}>
+            Email
+          </TabBtn>
+        )}
+        {esSuper && (
+          <TabBtn active={tab === "whatsapp"} onClick={() => setTab("whatsapp")}>
+            WhatsApp
+          </TabBtn>
+        )}
       </div>
 
       {tab === "usuarios" ? (

@@ -20,7 +20,7 @@ function mesesMoraAprox(saldo: number, cuota: number): number {
 
 const TIPOS = ["recordatorio_pago", "aviso_mora", "mantenimiento", "reunion", "general"];
 const CANALES = ["whatsapp", "email", "ambos"];
-const FILTROS = ["todos", "pendientes", "atrasados", "unidad"];
+const FILTROS = ["todos", "pendientes", "atrasados", "unidad", "calle"];
 
 function complejoEscritura(req: Request, res: Response): string | null {
   if (!req.complejoId) {
@@ -38,6 +38,7 @@ interface Destinatario {
   email: string | null;
   telefono: string | null;
   area: number | null;
+  calle: string | null;
   saldo: number;
   meses_mora: number;
   total_mora: number;
@@ -48,7 +49,8 @@ interface Destinatario {
 async function resolverDestinatarios(
   idComplejo: string,
   filtro: string,
-  idUnidad?: string
+  idUnidad?: string,
+  calle?: string
 ): Promise<Destinatario[]> {
   const inicioMes = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
 
@@ -56,6 +58,7 @@ async function resolverDestinatarios(
     prisma.unidades.findMany({
       where: { id_complejo: idComplejo, activo: true },
       include: {
+        calles: { select: { nombre: true } },
         historial_propietarios: {
           where: { fecha_fin: null },
           include: { propietarios: { select: { id: true, nombre: true, apellido: true, email: true, telefono: true } } },
@@ -103,6 +106,7 @@ async function resolverDestinatarios(
         email: p.email,
         telefono: p.telefono,
         area: u.area_m2 ? Number(u.area_m2) : null,
+        calle: u.calles?.nombre ?? u.calle ?? null,
         saldo: saldoPorUnidad.get(u.id) ?? 0,
         meses_mora: mesesMoraAprox(saldoPorUnidad.get(u.id) ?? 0, u.id_estado_unidad ? (cuotaPorEstado.get(u.id_estado_unidad) ?? 0) : 0),
         total_mora: calcularMora(saldoPorUnidad.get(u.id) ?? 0),
@@ -119,6 +123,8 @@ async function resolverDestinatarios(
       return todos.filter((d) => d.cuota_mensual > 0 && d.saldo > d.cuota_mensual + 0.001);
     case "unidad":
       return todos.filter((d) => d.id_unidad === idUnidad);
+    case "calle":
+      return todos.filter((d) => d.calle === calle);
     default:
       return todos;
   }
@@ -130,7 +136,7 @@ router.get("/destinatarios", async (req, res) => {
   if (!idc) return;
   const filtro = (req.query.filtro as string) || "todos";
   if (!FILTROS.includes(filtro)) return res.status(400).json({ message: "filtro inválido" });
-  const data = await resolverDestinatarios(idc, filtro, req.query.id_unidad as string);
+  const data = await resolverDestinatarios(idc, filtro, req.query.id_unidad as string, req.query.calle as string);
   res.json({ total: data.length, destinatarios: data });
 });
 
@@ -182,7 +188,7 @@ router.get("/:id", async (req, res) => {
 router.post("/", puedeAvisar, async (req, res) => {
   const idc = complejoEscritura(req, res);
   if (!idc) return;
-  const { tipo, asunto, mensaje, canal, filtro, id_unidad, id_unidades, programado_at, guardar_borrador, incluir_estado_cuenta } = req.body ?? {};
+  const { tipo, asunto, mensaje, canal, filtro, id_unidad, calle, id_unidades, programado_at, guardar_borrador, incluir_estado_cuenta } = req.body ?? {};
 
   if (!TIPOS.includes(tipo)) return res.status(400).json({ message: "tipo inválido" });
   if (!CANALES.includes(canal)) return res.status(400).json({ message: "canal inválido" });
@@ -192,7 +198,7 @@ router.post("/", puedeAvisar, async (req, res) => {
   const complejo = await prisma.complejos.findUnique({ where: { id: idc }, select: { nombre: true } });
   const complejoNombre = complejo?.nombre ?? "Residencial";
 
-  let destinatarios = await resolverDestinatarios(idc, filtro, id_unidad);
+  let destinatarios = await resolverDestinatarios(idc, filtro, id_unidad, calle);
   if (Array.isArray(id_unidades) && id_unidades.length > 0) {
     const allowed = new Set(id_unidades as string[]);
     destinatarios = destinatarios.filter((d: Destinatario) => allowed.has(d.id_unidad));

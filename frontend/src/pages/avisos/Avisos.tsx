@@ -4,11 +4,13 @@ import {
   getDestinatarios,
   getAvisos,
   createAviso,
+  getCalles,
   type Destinatario,
   type AvisosHistorial,
   type TipoAviso,
   type CanalAviso,
   type FiltroDest,
+  type Catalogo,
 } from "../../api/client";
 import Panel from "../../components/ui/Panel";
 import Button from "../../components/ui/Button";
@@ -29,6 +31,7 @@ const FILTROS: { id: FiltroDest; label: string }[] = [
   { id: "todos", label: "Todos los residentes" },
   { id: "pendientes", label: "Solo pendientes" },
   { id: "atrasados", label: "Solo atrasados" },
+  { id: "calle", label: "Por calle" },
   { id: "unidad", label: "Unidad específica" },
 ];
 const mesNombreActual = () => {
@@ -88,6 +91,8 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 function NuevoAviso({ borrador, onUsed }: { borrador: { tipo: TipoAviso; asunto: string; mensaje: string; canal: CanalAviso } | null; onUsed: () => void }) {
   const [tipo, setTipo] = useState<TipoAviso>("recordatorio_pago");
   const [filtro, setFiltro] = useState<FiltroDest>("todos");
+  const [calleSel, setCalleSel] = useState("");
+  const [calles, setCalles] = useState<Catalogo[]>([]);
   const [canal, setCanal] = useState<CanalAviso>("ambos");
   const [asunto, setAsunto] = useState("");
   const [mensaje, setMensaje] = useState(TIPO["recordatorio_pago"].plantilla);
@@ -112,10 +117,17 @@ function NuevoAviso({ borrador, onUsed }: { borrador: { tipo: TipoAviso; asunto:
   const [incluirEC, setIncluirEC] = useState(false);
 
   useEffect(() => {
-    getDestinatarios(filtro === "unidad" ? "todos" : filtro)
+    getCalles().then((c) => setCalles(c.filter((x) => x.activo))).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // "unidad" = selección manual sobre todos. "calle" filtra en el servidor.
+    if (filtro === "calle" && !calleSel) { setDests([]); return; }
+    const efectivo = filtro === "unidad" ? "todos" : filtro;
+    getDestinatarios(efectivo, undefined, filtro === "calle" ? calleSel : undefined)
       .then((r) => setDests(r.destinatarios))
       .catch(() => setDests([]));
-  }, [filtro]);
+  }, [filtro, calleSel]);
 
   useEffect(() => {
     if (filtro !== "unidad") {
@@ -172,6 +184,7 @@ function NuevoAviso({ borrador, onUsed }: { borrador: { tipo: TipoAviso; asunto:
         mensaje,
         canal,
         filtro: filtro === "unidad" ? "todos" : filtro,
+        calle: filtro === "calle" ? calleSel : undefined,
         id_unidades: filtro === "unidad" || selIds.size < dests.length ? [...selIds] : undefined,
         programado_at: programar && programadoAt ? new Date(programadoAt).toISOString() : undefined,
         guardar_borrador: borrador,
@@ -218,10 +231,18 @@ function NuevoAviso({ borrador, onUsed }: { borrador: { tipo: TipoAviso; asunto:
 
         <Panel title="Propiedades destinatarias">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <select value={filtro} onChange={(e) => { setFiltro(e.target.value as FiltroDest); setSelIds(new Set()); }} className={`${inputCls} w-52`}>
-              {FILTROS.filter((f) => f.id !== "unidad").map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
-              <option value="unidad">Selección manual</option>
-            </select>
+            <div className="flex items-center gap-2">
+              <select value={filtro} onChange={(e) => { setFiltro(e.target.value as FiltroDest); setSelIds(new Set()); setCalleSel(""); }} className={`${inputCls} w-52`}>
+                {FILTROS.filter((f) => f.id !== "unidad").map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+                <option value="unidad">Selección manual</option>
+              </select>
+              {filtro === "calle" && (
+                <select value={calleSel} onChange={(e) => { setCalleSel(e.target.value); setSelIds(new Set()); }} className={`${inputCls} w-44`}>
+                  <option value="">— Elige calle —</option>
+                  {calles.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                </select>
+              )}
+            </div>
             <span className="whitespace-nowrap rounded-md bg-sidebar-accent/10 px-3 py-2 text-base font-medium text-sidebar-accent">
               <IconHome size={14} className="mr-1 inline" />{selIds.size} seleccionadas
             </span>

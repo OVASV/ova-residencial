@@ -724,7 +724,7 @@ export const getSegmentacionDeuda = (periodo?: string) => apiGet<SegmentacionDeu
 // ---- Avisos (Sprint 6) ----
 export type TipoAviso = "recordatorio_pago" | "aviso_mora" | "mantenimiento" | "reunion" | "general";
 export type CanalAviso = "whatsapp" | "email" | "ambos";
-export type FiltroDest = "todos" | "pendientes" | "atrasados" | "unidad";
+export type FiltroDest = "todos" | "pendientes" | "atrasados" | "unidad" | "calle";
 
 export interface Destinatario {
   id_unidad: string;
@@ -734,6 +734,7 @@ export interface Destinatario {
   email: string | null;
   telefono: string | null;
   area: number | null;
+  calle: string | null;
   saldo: number;
   meses_mora: number;
   total_mora: number;
@@ -767,15 +768,16 @@ export interface NuevoAvisoPayload {
   canal: CanalAviso;
   filtro: FiltroDest;
   id_unidad?: string;
+  calle?: string;
   id_unidades?: string[];
   programado_at?: string;
   guardar_borrador?: boolean;
   incluir_estado_cuenta?: boolean;
 }
 
-export const getDestinatarios = (filtro: FiltroDest, idUnidad?: string) =>
+export const getDestinatarios = (filtro: FiltroDest, idUnidad?: string, calle?: string) =>
   apiGet<{ total: number; destinatarios: Destinatario[] }>(
-    `/avisos/destinatarios?filtro=${filtro}${idUnidad ? `&id_unidad=${encodeURIComponent(idUnidad)}` : ""}`
+    `/avisos/destinatarios?filtro=${filtro}${idUnidad ? `&id_unidad=${encodeURIComponent(idUnidad)}` : ""}${calle ? `&calle=${encodeURIComponent(calle)}` : ""}`
   );
 export const getAvisos = () => apiGet<AvisosHistorial>("/avisos");
 export const createAviso = (payload: NuevoAvisoPayload) => apiPost<AvisoResumen>("/avisos", payload);
