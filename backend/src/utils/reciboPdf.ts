@@ -17,6 +17,8 @@ export interface ReciboPdfData {
   cuota_monto: number | null;
   nombre_complejo: string | null;
   logo_path: string | null; // ruta absoluta en disco, opcional
+  saldo_actual: number | null; // saldo de la unidad al momento de emitir el recibo (positivo = deuda)
+  saldo_fecha: Date; // fecha/hora de cálculo del saldo
 }
 
 const VERDE = "#085041";
@@ -27,6 +29,11 @@ const LINEA = "#e2e5e2";
 const money = (n: number) =>
   "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fFecha = (d: Date) => d.toISOString().slice(0, 10);
+const fFechaHora = (d: Date) =>
+  d.toLocaleString("es-SV", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
 
 // Genera el recibo en PDF (Buffer), con un diseño equivalente al de impresión.
 export function generarReciboPdf(r: ReciboPdfData): Promise<Buffer> {
@@ -101,6 +108,17 @@ export function generarReciboPdf(r: ReciboPdfData): Promise<Buffer> {
       .text("TOTAL PAGADO", L + 16, y + 14);
     doc.fontSize(16).fillColor(VERDE)
       .text(money(r.monto_total), R - 180, y + 11, { width: 164, align: "right" });
+
+    // ---- Saldo a la fecha (esquina inferior derecha, letra pequeña y tenue) ----
+    if (r.saldo_actual != null) {
+      y += 48;
+      doc.font("Helvetica").fontSize(8).fillColor("#9aa0a6")
+        .text(`Saldo a la fecha (${fFechaHora(r.saldo_fecha)}): ${money(r.saldo_actual)}`,
+          L, y, { width: W, align: "right" });
+      doc.fontSize(7).fillColor("#b0b5ba")
+        .text("Este saldo puede variar según la actualización de abonos registrados por la administración.",
+          L, y + 11, { width: W, align: "right" });
+    }
 
     // ---- Pie ----
     doc.font("Helvetica").fontSize(8).fillColor("#9aa0a6")

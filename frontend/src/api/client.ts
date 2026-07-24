@@ -418,6 +418,8 @@ export interface ReciboItem {
   conceptos: string;
   cuota_asignada: { concepto: string; monto: string | number; tipo_propiedad: string | null } | null;
   justificacion_traslado: string | null;
+  saldo_actual: string | number;
+  saldo_fecha: string;
   pago_cargos: { concepto: string; periodo_mes: string; monto_aplicado: string | number; monto_cargo: string | number }[];
 }
 export interface RecibosResponse {

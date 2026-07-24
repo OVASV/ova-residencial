@@ -5,6 +5,11 @@ import { getRecibosByIds, type ReciboItem } from "../../api/client";
 import { formatDate, formatCurrency } from "../../utils/formatters";
 
 const hoy = () => new Date().toLocaleDateString("es-GT", { year: "numeric", month: "long", day: "numeric" });
+const fechaHora = (iso: string) =>
+  new Date(iso).toLocaleString("es-SV", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  });
 
 export default function ReciboPDF() {
   const [params] = useSearchParams();
@@ -166,6 +171,17 @@ export default function ReciboPDF() {
           <div className="flex items-center justify-end gap-4 rounded-md border-2 border-[#085041] bg-[#085041]/5 px-6 py-3">
             <span className="text-[13px] font-semibold uppercase tracking-wide text-[#085041]">Total pagado</span>
             <span className="font-mono text-[18px] font-bold text-[#085041]">{formatCurrency(Number(r.monto_total))}</span>
+          </div>
+
+          {/* Saldo a la fecha */}
+          <div className="mt-2 text-right text-[9px] leading-[1.4] text-gray-400">
+            <div>
+              Saldo a la fecha ({fechaHora(r.saldo_fecha)}):{" "}
+              <span className="font-mono font-medium">{formatCurrency(Number(r.saldo_actual))}</span>
+            </div>
+            <div className="text-[8px] text-gray-300">
+              Este saldo puede variar según la actualización de abonos registrados por la administración.
+            </div>
           </div>
 
           <div className="mt-8 border-t border-gray-200 pt-3 text-center text-[9px] text-gray-400">

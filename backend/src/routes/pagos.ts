@@ -8,6 +8,7 @@ import { upload, tipoComprobante, borrarArchivo, UPLOAD_DIR } from "../upload.js
 import { estaPeriodoCerrado, periodoDeFecha, PERIODO_CERRADO_MSG } from "../utils/cierres.js";
 import { sendBulkEmails } from "../utils/mailer.js";
 import { generarReciboPdf, type ReciboPdfData } from "../utils/reciboPdf.js";
+import { getSaldoUnidad, getSaldosPorUnidad } from "../utils/saldos.js";
 
 const router = Router();
 const soloAdmin = requireRole("admin", "superadmin");
@@ -111,6 +112,9 @@ router.get("/recibos", async (req, res) => {
       : Promise.resolve(null),
   ]);
 
+  const saldosMap = complejoId ? await getSaldosPorUnidad(complejoId) : new Map<string, number>();
+  const saldoFecha = new Date().toISOString();
+
   const result = await Promise.all(data.map(async (p) => {
     const hist = await prisma.historial_propietarios.findFirst({
       where: { id_unidad: p.id_unidad, fecha_fin: null },
@@ -142,6 +146,8 @@ router.get("/recibos", async (req, res) => {
       conceptos: p.pago_cargos.map((pc) => pc.cargos.concepto).join(", "),
       cuota_asignada: cuotaUnidad ? { concepto: cuotaUnidad.concepto, monto: cuotaUnidad.monto, tipo_propiedad: estadoUnidad?.nombre ?? null } : null,
       justificacion_traslado: traslado?.justificacion ?? null,
+      saldo_actual: saldosMap.get(p.id_unidad) ?? 0,
+      saldo_fecha: saldoFecha,
       pago_cargos: p.pago_cargos.map((pc) => ({
         concepto: pc.cargos.concepto,
         periodo_mes: pc.cargos.periodo_mes,
@@ -458,6 +464,7 @@ async function construirReciboData(idc: string, pagoId: string): Promise<{ data:
   ]);
 
   const logoPath = complejo?.logo_url ? path.join(UPLOAD_DIR, complejo.logo_url.replace(/^\/+uploads\/+/, "")) : null;
+  const saldoActual = await getSaldoUnidad(idc, pago.id_unidad);
 
   const data: ReciboPdfData = {
     id: pago.id,
@@ -475,6 +482,8 @@ async function construirReciboData(idc: string, pagoId: string): Promise<{ data:
     cuota_monto: cuota ? cuota.monto.toNumber() : null,
     nombre_complejo: complejo?.nombre ?? null,
     logo_path: logoPath,
+    saldo_actual: saldoActual,
+    saldo_fecha: new Date(),
   };
   return { data, email: hist?.propietarios.email ?? null };
 }
