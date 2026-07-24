@@ -31,6 +31,7 @@ const money = (n: number) =>
 const fFecha = (d: Date) => d.toISOString().slice(0, 10);
 const fFechaHora = (d: Date) =>
   d.toLocaleString("es-SV", {
+    timeZone: "America/El_Salvador",
     day: "2-digit", month: "2-digit", year: "numeric",
     hour: "2-digit", minute: "2-digit", hour12: true,
   });
