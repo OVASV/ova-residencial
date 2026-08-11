@@ -1216,7 +1216,7 @@ export interface TransparenciaData {
 export interface DetalleMesData {
   periodo: string;
   recaudado: number;
-  gastos: { descripcion: string; proveedor: string | null; monto: number; categoria: string; fecha: string }[];
+  gastos: { descripcion: string; proveedor: string | null; monto: number; categoria: string; fecha: string; comprobante_url: string | null; comprobante_tipo: string | null }[];
 }
 
 export const getTransparencia = () => apiGet<TransparenciaData>("/portal/transparencia");

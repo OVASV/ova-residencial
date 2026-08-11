@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronUp, IconFileTypePdf, IconPhoto } from "@tabler/icons-react";
 import { getTransparencia, getDetalleMes, getSegmentacionDeuda, type TransparenciaData, type DetalleMesData, type SegmentacionDeuda } from "../../api/client";
 import MonoAmount from "../../components/ui/MonoAmount";
 import { formatCurrency, formatDate } from "../../utils/formatters";
@@ -226,7 +226,21 @@ export default function Transparencia() {
                                           </span>
                                           <span className="shrink-0 text-etiqueta text-black/35">{formatDate(g.fecha)}</span>
                                         </span>
-                                        <span className="ml-2 shrink-0 font-mono text-black/60">{formatCurrency(g.monto)}</span>
+                                        <span className="ml-2 flex shrink-0 items-center gap-2">
+                                          {g.comprobante_url && (
+                                            <a
+                                              href={g.comprobante_url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              onClick={(e) => e.stopPropagation()}
+                                              className="flex items-center gap-0.5 text-etiqueta text-sidebar-accent hover:underline"
+                                              title="Ver escaneo del comprobante"
+                                            >
+                                              {g.comprobante_tipo === "pdf" ? <IconFileTypePdf size={14} /> : <IconPhoto size={14} />} ver
+                                            </a>
+                                          )}
+                                          <span className="font-mono text-black/60">{formatCurrency(g.monto)}</span>
+                                        </span>
                                       </div>
                                     ))}
                                   </div>

@@ -363,7 +363,7 @@ router.get("/transparencia/:periodo", async (req, res) => {
   const [gastosDetalle, pagosTotal] = await Promise.all([
     prisma.gastos.findMany({
       where: { id_complejo: complejoId, fecha: { gte: inicio, lt: fin } },
-      select: { descripcion: true, proveedor: true, monto: true, categoria: true, fecha: true },
+      select: { descripcion: true, proveedor: true, monto: true, categoria: true, fecha: true, comprobante_url: true, comprobante_tipo: true },
       orderBy: { fecha: "asc" },
     }),
     prisma.pagos.aggregate({
@@ -381,6 +381,8 @@ router.get("/transparencia/:periodo", async (req, res) => {
       monto: g.monto.toNumber(),
       categoria: g.categoria,
       fecha: g.fecha,
+      comprobante_url: g.comprobante_url,
+      comprobante_tipo: g.comprobante_tipo,
     })),
   });
 });
