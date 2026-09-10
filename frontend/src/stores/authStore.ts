@@ -27,6 +27,7 @@ interface AuthState {
   // el id_complejo del token y este campo se ignora.
   complejoActivo: ComplejoActivo | null;
   setSession: (s: { token: string; refreshToken: string; user: AuthUser }) => void;
+  setToken: (token: string) => void;
   setComplejoActivo: (c: ComplejoActivo | null) => void;
   logout: () => void;
 }
@@ -40,6 +41,7 @@ export const useAuth = create<AuthState>()(
       user: null,
       complejoActivo: null,
       setSession: ({ token, refreshToken, user }) => set({ token, refreshToken, user }),
+      setToken: (token) => set({ token }),
       setComplejoActivo: (complejoActivo) => set({ complejoActivo }),
       logout: () => set({ token: null, refreshToken: null, user: null, complejoActivo: null }),
     }),

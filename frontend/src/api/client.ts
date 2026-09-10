@@ -4,25 +4,65 @@ import { useAuth, type AuthUser } from "../stores/authStore";
 
 const BASE = "/api/v1";
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const { token, user, complejoActivo } = useAuth.getState();
+// Renovación del token de acceso usando el refresh token (válido 30 días).
+// Se comparte una sola promesa en vuelo para que varias peticiones que reciban
+// 401 a la vez no disparen múltiples refrescos.
+let refreshEnCurso: Promise<boolean> | null = null;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(options.headers as Record<string, string> | undefined),
-  };
+async function intentarRefrescar(): Promise<boolean> {
+  const { refreshToken } = useAuth.getState();
+  if (!refreshToken) return false;
+  if (!refreshEnCurso) {
+    refreshEnCurso = (async () => {
+      try {
+        const res = await fetch(`${BASE}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (!res.ok) return false;
+        const data = (await res.json()) as { token?: string };
+        if (!data.token) return false;
+        useAuth.getState().setToken(data.token);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshEnCurso = null;
+      }
+    })();
+  }
+  return refreshEnCurso;
+}
+
+// Construye los headers con el token actual del store.
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const { token, user, complejoActivo } = useAuth.getState();
+  const headers: Record<string, string> = { "Content-Type": "application/json", ...extra };
   if (token) headers.Authorization = `Bearer ${token}`;
   // Superadmin (multiempresa): opera sobre el complejo activo seleccionado.
   // Admin/lectura usan el id_complejo de su token (no requieren header).
   if (user?.rol === "superadmin" && complejoActivo) {
     headers["X-Complejo-ID"] = complejoActivo.id;
   }
+  return headers;
+}
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const extra = options.headers as Record<string, string> | undefined;
+  let res = await fetch(`${BASE}${path}`, { ...options, headers: authHeaders(extra) });
 
+  // Token de acceso vencido: intenta renovarlo con el refresh token y reintenta
+  // una sola vez. Solo si el refresh también falla se cierra la sesión.
   if (res.status === 401) {
-    useAuth.getState().logout();
-    throw new Error("Sesión expirada");
+    const ok = await intentarRefrescar();
+    if (ok) {
+      res = await fetch(`${BASE}${path}`, { ...options, headers: authHeaders(extra) });
+    }
+    if (res.status === 401) {
+      useAuth.getState().logout();
+      throw new Error("Sesión expirada");
+    }
   }
   if (!res.ok) {
     const msg = await res.json().catch(() => ({}));
@@ -42,16 +82,27 @@ export const apiDelete = (path: string) => request<void>(path, { method: "DELETE
 
 // Subida de archivos (multipart). No fija Content-Type: el navegador pone el boundary.
 async function uploadArchivo<T>(path: string, file: File): Promise<T> {
-  const { token, user } = useAuth.getState();
+  const mkHeaders = (): Record<string, string> => {
+    const { token, user } = useAuth.getState();
+    const h: Record<string, string> = {};
+    if (token) h.Authorization = `Bearer ${token}`;
+    if (user?.rol === "superadmin" && user.id_complejo) h["X-Complejo-ID"] = user.id_complejo;
+    return h;
+  };
   const fd = new FormData();
   fd.append("archivo", file);
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (user?.rol === "superadmin" && user.id_complejo) headers["X-Complejo-ID"] = user.id_complejo;
-  const res = await fetch(`${BASE}${path}`, { method: "POST", body: fd, headers });
+  let res = await fetch(`${BASE}${path}`, { method: "POST", body: fd, headers: mkHeaders() });
   if (res.status === 401) {
-    useAuth.getState().logout();
-    throw new Error("Sesión expirada");
+    // FormData no se puede reenviar dos veces; se reconstruye para el reintento.
+    if (await intentarRefrescar()) {
+      const fd2 = new FormData();
+      fd2.append("archivo", file);
+      res = await fetch(`${BASE}${path}`, { method: "POST", body: fd2, headers: mkHeaders() });
+    }
+    if (res.status === 401) {
+      useAuth.getState().logout();
+      throw new Error("Sesión expirada");
+    }
   }
   if (!res.ok) {
     const msg = await res.json().catch(() => ({}));
@@ -664,15 +715,19 @@ export const desactivarUsuarioStaff = (id: string) => apiDelete(`/usuarios/${id}
 export const getCierres = () => apiGet<CierrePeriodo[]>(`/cierres`);
 // Cierre con comprobante bancario obligatorio (multipart: periodo + archivo PDF).
 export async function cerrarPeriodo(periodo: string, file: File) {
-  const { token, user, complejoActivo } = useAuth.getState();
-  const fd = new FormData();
-  fd.append("periodo", periodo);
-  fd.append("archivo", file);
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (user?.rol === "superadmin" && complejoActivo) headers["X-Complejo-ID"] = complejoActivo.id;
-  const res = await fetch(`${BASE}/cierres`, { method: "POST", body: fd, headers });
-  if (res.status === 401) { useAuth.getState().logout(); throw new Error("Sesión expirada"); }
+  const mkFd = () => { const fd = new FormData(); fd.append("periodo", periodo); fd.append("archivo", file); return fd; };
+  const mkHeaders = (): Record<string, string> => {
+    const { token, user, complejoActivo } = useAuth.getState();
+    const h: Record<string, string> = {};
+    if (token) h.Authorization = `Bearer ${token}`;
+    if (user?.rol === "superadmin" && complejoActivo) h["X-Complejo-ID"] = complejoActivo.id;
+    return h;
+  };
+  let res = await fetch(`${BASE}/cierres`, { method: "POST", body: mkFd(), headers: mkHeaders() });
+  if (res.status === 401) {
+    if (await intentarRefrescar()) res = await fetch(`${BASE}/cierres`, { method: "POST", body: mkFd(), headers: mkHeaders() });
+    if (res.status === 401) { useAuth.getState().logout(); throw new Error("Sesión expirada"); }
+  }
   if (!res.ok) { const m = await res.json().catch(() => ({})); throw new Error(m.message ?? "No se pudo cerrar el período"); }
   return res.json() as Promise<{ periodo: string; cerrado: boolean; email: { sent: number; configured: boolean } }>;
 }
@@ -680,14 +735,20 @@ export const reabrirPeriodo = (periodo: string, datos: { solicitado_por: string;
   apiPost<{ periodo: string; cerrado: boolean }>(`/cierres/${periodo}/reabrir`, datos);
 // Sube/reemplaza el comprobante bancario aunque el mes esté cerrado (no toca la data contable).
 export async function subirComprobanteCierre(periodo: string, file: File) {
-  const { token, user, complejoActivo } = useAuth.getState();
-  const fd = new FormData();
-  fd.append("archivo", file);
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (user?.rol === "superadmin" && complejoActivo) headers["X-Complejo-ID"] = complejoActivo.id;
-  const res = await fetch(`${BASE}/cierres/${periodo}/comprobante`, { method: "PUT", body: fd, headers });
-  if (res.status === 401) { useAuth.getState().logout(); throw new Error("Sesión expirada"); }
+  const mkFd = () => { const fd = new FormData(); fd.append("archivo", file); return fd; };
+  const mkHeaders = (): Record<string, string> => {
+    const { token, user, complejoActivo } = useAuth.getState();
+    const h: Record<string, string> = {};
+    if (token) h.Authorization = `Bearer ${token}`;
+    if (user?.rol === "superadmin" && complejoActivo) h["X-Complejo-ID"] = complejoActivo.id;
+    return h;
+  };
+  const url = `${BASE}/cierres/${periodo}/comprobante`;
+  let res = await fetch(url, { method: "PUT", body: mkFd(), headers: mkHeaders() });
+  if (res.status === 401) {
+    if (await intentarRefrescar()) res = await fetch(url, { method: "PUT", body: mkFd(), headers: mkHeaders() });
+    if (res.status === 401) { useAuth.getState().logout(); throw new Error("Sesión expirada"); }
+  }
   if (!res.ok) { const m = await res.json().catch(() => ({})); throw new Error(m.message ?? "No se pudo subir el comprobante"); }
   return res.json() as Promise<{ periodo: string; comprobante_url: string; comprobante_nombre: string }>;
 }
