@@ -237,6 +237,9 @@ router.post("/", soloAdmin, async (req, res) => {
       if (restante <= 0) break;
       const saldoActual = c.saldo.toNumber();
       const aplicar = r2(Math.min(restante, saldoActual));
+      // Salta cargos sin saldo real (saldo 0 en estado pendiente/parcial por
+      // inconsistencia de datos): aplicar $0 viola CK_pago_cargos_monto (>0).
+      if (aplicar <= 0) continue;
       autoDetalle.push({ id_cargo: c.id, monto: aplicar, saldoActual });
       restante = r2(restante - aplicar);
     }
