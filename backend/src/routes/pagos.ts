@@ -182,6 +182,7 @@ router.post("/", soloAdmin, async (req, res) => {
   const idc = complejoEscritura(req, res);
   if (!idc) return;
 
+  try {
   const {
     id_unidad,
     fecha_pago,
@@ -335,6 +336,9 @@ router.post("/", soloAdmin, async (req, res) => {
   });
 
   res.status(201).json({ ...pago, cargos_saldados: detalle.length });
+  } catch (err: any) {
+    return res.status(400).json({ message: err?.message ?? "No se pudo registrar el pago" });
+  }
 });
 
 // PATCH /pagos/:id — edita datos no contables del pago (descripción, referencia,
