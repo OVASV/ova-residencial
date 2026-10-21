@@ -129,9 +129,9 @@ export default function Sidebar({ open, onClose }: { open?: boolean; onClose?: (
   if (onClose !== undefined) {
     return (
       <>
-        {open && <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={onClose} />}
+        {open && <div className="fixed inset-0 z-[1100] bg-black/50 md:hidden" onClick={onClose} />}
         <div
-          className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 md:relative md:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-[1101] transform transition-transform duration-200 md:relative md:z-auto md:translate-x-0 ${
             open ? "translate-x-0" : "-translate-x-full"
           }`}
         >
