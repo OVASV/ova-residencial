@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { IconArrowLeft, IconPrinter } from "@tabler/icons-react";
+import { IconArrowLeft, IconPrinter, IconFileTypePdf, IconPhoto } from "@tabler/icons-react";
 import { getResumenGastos, getGastos, type ResumenGastos, type Gasto, type CategoriaGasto } from "../../api/client";
 import Panel from "../../components/ui/Panel";
 import MonoAmount from "../../components/ui/MonoAmount";
@@ -147,6 +147,7 @@ export default function ReporteGastos() {
                     <th className="py-1.5 font-medium">No. factura</th>
                     <th className="py-1.5 font-medium">Método</th>
                     <th className="py-1.5 text-right font-medium">Monto</th>
+                    <th className="py-1.5 text-center font-medium no-print">Anexo</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -158,6 +159,21 @@ export default function ReporteGastos() {
                       <td className="py-2 font-mono text-black/55">{g.no_factura ?? "—"}</td>
                       <td className="py-2 capitalize text-black/60">{g.metodo ?? "—"}</td>
                       <td className="py-2 text-right"><MonoAmount value={Number(g.monto)} /></td>
+                      <td className="py-2 text-center no-print">
+                        {g.comprobante_url ? (
+                          <a
+                            href={g.comprobante_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-0.5 text-sidebar-accent hover:underline"
+                            title="Ver anexo en otra pestaña"
+                          >
+                            {g.comprobante_tipo === "pdf" ? <IconFileTypePdf size={15} /> : <IconPhoto size={15} />} ver
+                          </a>
+                        ) : (
+                          <span className="text-black/25">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
